@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Resizer – ToolNova</title>
+  <meta name="description" content="Resize your images online for free. Upload JPG, PNG, WebP, set custom dimensions, and download the result. No signup required." />
+  <link rel="canonical" href="https://toolnova.com/image-resizer.html" />
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="Image Resizer – ToolNova" />
+  <meta property="og:description" content="Resize images online with custom width/height. Keep aspect ratio. Download the resized image. Completely free." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://toolnova.com/image-resizer.html" />
+  <meta property="og:image" content="https://toolnova.com/og-image.jpg" />
+
+  <!-- Schema -->
+  <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Image Resizer",
+      "description": "Resize your images online for free.",
+      "url": "https://toolnova.com/image-resizer.html"
+    }
+  </script>
+
+  <style>
+    /* ===== ToolNova base styles ===== */
+    :root {
+      --bg-primary: #f8faff;
+      --bg-secondary: #ffffff;
+      --bg-card: #ffffff;
+      --bg-input: #f0f4ff;
+      --bg-nav: rgba(255,255,255,0.80);
+      --text-primary: #0b1a33;
+      --text-secondary: #2d3a4f;
+      --text-muted: #6b7a8f;
+      --border-color: #e6edf5;
+      --shadow-sm: 0 2px 12px rgba(11,26,51,0.06);
+      --shadow-md: 0 8px 32px rgba(11,26,51,0.08);
+      --shadow-lg: 0 16px 56px rgba(11,26,51,0.10);
+      --shadow-hover: 0 20px 60px rgba(11,26,51,0.12);
+      --radius: 16px;
+      --radius-sm: 10px;
+      --radius-full: 60px;
+      --transition: 0.3s cubic-bezier(0.25,0.46,0.45,0.94);
+      --accent: #2563eb;
+      --accent-light: #3b82f6;
+      --accent-dark: #1d4ed8;
+      --accent-glow: rgba(37,99,235,0.20);
+      --gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      --gradient-soft: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --nav-height: 72px;
+    }
+    [data-theme="dark"] {
+      --bg-primary: #0a1628;
+      --bg-secondary: #111f3a;
+      --bg-card: #15243f;
+      --bg-input: #1a2a4a;
+      --bg-nav: rgba(10,22,40,0.88);
+      --text-primary: #f0f4ff;
+      --text-secondary: #c8d2e6;
+      --text-muted: #8a9bb5;
+      --border-color: #1e3150;
+      --shadow-sm: 0 2px 12px rgba(0,0,0,0.30);
+      --shadow-md: 0 8px 32px rgba(0,0,0,0.40);
+      --shadow-lg: 0 16px 56px rgba(0,0,0,0.50);
+      --shadow-hover: 0 20px 60px rgba(0,0,0,0.60);
+      --accent-glow: rgba(59,130,246,0.25);
+      --gradient-soft: linear-gradient(135deg, #0f2847 0%, #1a3a66 100%);
+    }
+
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; font-size:16px; }
+    body {
+      font-family: var(--font);
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height:1.6;
+      transition: background 0.35s ease, color 0.35s ease;
+      padding-top: var(--nav-height);
+    }
+    a { text-decoration:none; color:inherit; }
+    ul { list-style:none; }
+    button { cursor:pointer; font-family:var(--font); border:none; background:none; color:inherit; }
+    input { font-family:var(--font); border:none; outline:none; background:none; color:inherit; }
+    .container { max-width:1200px; margin:0 auto; padding:0 24px; }
+
+    /* ===== Buttons ===== */
+    .btn {
+      display:inline-flex; align-items:center; justify-content:center; gap:8px;
+      padding:14px 32px; border-radius:var(--radius-full); font-weight:600; font-size:0.95rem;
+      transition:var(--transition); border:2px solid transparent; white-space:nowrap;
+    }
+    .btn-primary {
+      background:var(--gradient); color:#fff; box-shadow:0 4px 20px var(--accent-glow); border-color:var(--accent);
+    }
+    .btn-primary:hover { transform:translateY(-3px); box-shadow:0 8px 32px var(--accent-glow); }
+    .btn-outline {
+      background:transparent; border-color:var(--border-color); color:var(--text-primary);
+    }
+    .btn-outline:hover { border-color:var(--accent); color:var(--accent); transform:translateY(-3px); background:var(--bg-input); }
+
+    /* ===== Navbar ===== */
+    .navbar {
+      position:fixed; top:0; left:0; right:0; z-index:1000; height:var(--nav-height);
+      background:var(--bg-nav); backdrop-filter:blur(20px) saturate(180%);
+      -webkit-backdrop-filter:blur(20px) saturate(180%);
+      border-bottom:1px solid var(--border-color);
+      transition:background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+      display:flex; align-items:center;
+    }
+    .navbar.scrolled { box-shadow:var(--shadow-sm); }
+    .navbar .container {
+      display:flex; align-items:center; justify-content:space-between; gap:16px; width:100%;
+    }
+    .logo {
+      font-size:1.5rem; font-weight:800; letter-spacing:-0.5px;
+      background:var(--gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text;
+      flex-shrink:0; display:flex; align-items:center; gap:2px;
+    }
+    .logo span { font-weight:300; -webkit-text-fill-color:var(--text-muted); background:none; }
+    [data-theme="dark"] .logo span { -webkit-text-fill-color:var(--text-muted); }
+
+    .nav-links {
+      display:flex; align-items:center; gap:32px;
+    }
+    .nav-links a {
+      font-size:0.9rem; font-weight:500; color:var(--text-secondary); transition:var(--transition);
+      position:relative; padding:4px 0;
+    }
+    .nav-links a::after {
+      content:''; position:absolute; bottom:-2px; left:0; width:0; height:2px;
+      background:var(--gradient); transition:var(--transition); border-radius:4px;
+    }
+    .nav-links a:hover::after, .nav-links a.active::after { width:100%; }
+    .nav-links a:hover { color:var(--text-primary); }
+    .nav-links a.active { color:var(--text-primary); }
+
+    .nav-actions {
+      display:flex; align-items:center; gap:8px; flex-shrink:0;
+    }
+    .theme-toggle {
+      padding:8px; border-radius:50%; transition:var(--transition); font-size:1.2rem;
+      display:flex; align-items:center; justify-content:center; width:40px; height:40px;
+    }
+    .theme-toggle:hover { background:var(--bg-input); }
+
+    .hamburger {
+      display:none; flex-direction:column; gap:5px; padding:6px; border-radius:8px; transition:var(--transition);
+    }
+    .hamburger:hover { background:var(--bg-input); }
+    .hamburger span {
+      display:block; width:24px; height:2.5px; background:var(--text-primary); border-radius:4px;
+      transition:var(--transition); transform-origin:center;
+    }
+    .hamburger.active span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
+    .hamburger.active span:nth-child(2) { opacity:0; transform:scaleX(0); }
+    .hamburger.active span:nth-child(3) { transform:rotate(-45deg) translate(5px,-5px); }
+
+    /* ===== Tool page header ===== */
+    .tool-header {
+      padding:40px 0 16px;
+      background:var(--gradient-soft);
+      transition:background 0.35s ease;
+      border-bottom:1px solid var(--border-color);
+    }
+    [data-theme="dark"] .tool-header { background:var(--bg-secondary); }
+    .tool-header h1 {
+      font-size:clamp(1.8rem, 3vw, 2.6rem);
+      font-weight:700; letter-spacing:-0.5px;
+    }
+    .tool-header p { color:var(--text-secondary); font-size:1.05rem; }
+
+    /* ===== Tool UI ===== */
+    .tool-section { padding:48px 0; }
+    .tool-grid {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:32px;
+      align-items:start;
+    }
+    .control-panel {
+      background:var(--bg-card);
+      border:1px solid var(--border-color);
+      border-radius:var(--radius);
+      padding:28px 24px;
+      box-shadow:var(--shadow-sm);
+    }
+    .control-panel h3 { font-weight:600; margin-bottom:20px; }
+    .upload-area {
+      border:2px dashed var(--border-color);
+      border-radius:var(--radius-sm);
+      padding:40px 20px;
+      text-align:center;
+      transition:var(--transition);
+      cursor:pointer;
+      background:var(--bg-input);
+    }
+    .upload-area:hover { border-color:var(--accent); background:var(--bg-card); }
+    .upload-area.dragover { border-color:var(--accent); background:var(--bg-card); box-shadow:0 0 0 4px var(--accent-glow); }
+    .upload-area .icon { font-size:3rem; display:block; margin-bottom:8px; }
+    .upload-area input[type="file"] { display:none; }
+    .upload-area p { color:var(--text-muted); }
+
+    .dimension-controls {
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:16px;
+      margin:24px 0 16px;
+    }
+    .dimension-controls label {
+      font-weight:500; font-size:0.9rem;
+      display:flex; flex-direction:column; gap:4px;
+    }
+    .dimension-controls input {
+      padding:10px 14px;
+      border:2px solid var(--border-color);
+      border-radius:var(--radius-sm);
+      background:var(--bg-input);
+      color:var(--text-primary);
+      font-size:1rem;
+      transition:var(--transition);
+      width:100%;
+    }
+    .dimension-controls input:focus {
+      border-color:var(--accent);
+      box-shadow:0 0 0 4px var(--accent-glow);
+    }
+    .dimension-controls input:disabled {
+      opacity:0.6; cursor:not-allowed;
+    }
+
+    .checkbox-group {
+      display:flex; align-items:center; gap:10px; margin-bottom:20px;
+    }
+    .checkbox-group input[type="checkbox"] {
+      width:20px; height:20px; accent-color:var(--accent);
+      cursor:pointer;
+    }
+    .checkbox-group label { font-weight:500; cursor:pointer; }
+
+    .preview-area {
+      display:flex; flex-direction:column; gap:24px;
+    }
+    .preview-box {
+      background:var(--bg-card);
+      border:1px solid var(--border-color);
+      border-radius:var(--radius);
+      padding:20px;
+      box-shadow:var(--shadow-sm);
+      text-align:center;
+    }
+    .preview-box h4 {
+      font-weight:600; margin-bottom:12px; font-size:1rem;
+    }
+    .preview-box .image-wrapper {
+      display:flex; justify-content:center; align-items:center;
+      min-height:150px;
+      background:var(--bg-input);
+      border-radius:var(--radius-sm);
+      overflow:hidden;
+      padding:8px;
+    }
+    .preview-box .image-wrapper img {
+      max-width:100%;
+      max-height:300px;
+      object-fit:contain;
+      display:block;
+    }
+    .preview-box .dimensions-info {
+      margin-top:12px;
+      font-size:0.9rem;
+      color:var(--text-secondary);
+    }
+    .preview-box .dimensions-info span { font-weight:600; color:var(--text-primary); }
+
+    .download-area {
+      margin-top:24px;
+      display:flex; justify-content:center;
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width:992px) {
+      .tool-grid { grid-template-columns:1fr; }
+    }
+    @media (max-width:768px) {
+      .nav-links {
+        position:fixed; top:var(--nav-height); left:0; right:0;
+        background:var(--bg-nav); backdrop-filter:blur(20px) saturate(180%);
+        -webkit-backdrop-filter:blur(20px) saturate(180%);
+        flex-direction:column; padding:28px 24px 32px; gap:16px;
+        border-bottom:1px solid var(--border-color);
+        transform:translateY(-120%);
+        transition:transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94);
+        box-shadow:var(--shadow-lg); align-items:stretch;
+      }
+      .nav-links.open { transform:translateY(0); }
+      .nav-links a { font-size:1rem; padding:8px 0; text-align:center; }
+      .nav-links a::after { display:none; }
+      .hamburger { display:flex; }
+      .dimension-controls { grid-template-columns:1fr; }
+      .tool-header { padding:24px 0 12px; }
+      .tool-section { padding:24px 0; }
+    }
+    @media (max-width:480px) {
+      .container { padding:0 16px; }
+      .control-panel { padding:20px 16px; }
+      .upload-area { padding:24px 16px; }
+      .preview-box .image-wrapper img { max-height:200px; }
+    }
+
+    /* ===== Footer ===== */
+    .footer {
+      background:var(--bg-secondary);
+      border-top:1px solid var(--border-color);
+      padding:48px 0 24px;
+      transition:background 0.35s ease;
+    }
+    .footer-grid {
+      display:grid;
+      grid-template-columns:2fr 1fr 1fr 1fr 1fr;
+      gap:32px;
+      margin-bottom:32px;
+    }
+    .footer-brand .logo { font-size:1.4rem; margin-bottom:8px; display:inline-block; }
+    .footer-brand p { color:var(--text-muted); font-size:0.9rem; max-width:240px; line-height:1.6; }
+    .footer-col h5 { font-weight:600; margin-bottom:14px; font-size:0.9rem; color:var(--text-primary); }
+    .footer-col a { display:block; font-size:0.85rem; color:var(--text-muted); padding:4px 0; transition:var(--transition); }
+    .footer-col a:hover { color:var(--accent); transform:translateX(4px); }
+    .footer-social { display:flex; gap:12px; margin-top:12px; }
+    .footer-social a {
+      display:flex; align-items:center; justify-content:center; width:40px; height:40px;
+      border-radius:50%; background:var(--bg-input); border:1px solid var(--border-color);
+      color:var(--text-secondary); font-size:1.1rem; transition:var(--transition);
+    }
+    .footer-social a:hover { background:var(--accent); color:#fff; border-color:var(--accent); transform:translateY(-3px); }
+    .footer-bottom { text-align:center; font-size:0.82rem; color:var(--text-muted); border-top:1px solid var(--border-color); padding-top:24px; }
+
+    @media (max-width:1024px) {
+      .footer-grid { grid-template-columns:1fr 1fr 1fr; gap:28px; }
+      .footer-brand { grid-column:1 / -1; }
+    }
+    @media (max-width:768px) {
+      .footer-grid { grid-template-columns:1fr 1fr; gap:24px; }
+      .footer-brand { grid-column:1 / -1; }
+    }
+    @media (max-width:480px) {
+      .footer-grid { grid-template-columns:1fr; gap:20px; }
+    }
+
+    /* ===== Utilities ===== */
+    .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); border:0; }
+    .text-center { text-align:center; }
+  </style>
+</head>
+<body>
+
+  <!-- ===== NAVBAR ===== -->
+  <header class="navbar" id="navbar" role="banner">
+    <div class="container">
+      <a href="index.html" class="logo" aria-label="ToolNova home">Tool<span>Nova</span></a>
+      <ul class="nav-links" id="navLinks" role="menubar">
+        <li role="none"><a href="index.html" role="menuitem">Home</a></li>
+        <li role="none"><a href="index.html#tools" role="menuitem">Tools</a></li>
+        <li role="none"><a href="index.html#categories" role="menuitem">Categories</a></li>
+        <li role="none"><a href="index.html#blog" role="menuitem">Blog</a></li>
+        <li role="none"><a href="index.html#about" role="menuitem">About</a></li>
+        <li role="none"><a href="index.html#footer" role="menuitem">Contact</a></li>
+      </ul>
+      <div class="nav-actions">
+        <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle theme">
+          <span id="themeIcon">🌙</span>
+        </button>
+        <div class="hamburger" id="hamburger" aria-label="Toggle menu" role="button" tabindex="0">
+          <span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ===== TOOL HEADER ===== -->
+    <div class="tool-header">
+      <div class="container">
+        <h1>🖼️ Image Resizer</h1>
+        <p>Upload an image, set custom width and height, and download the resized version. Keep aspect ratio with one click.</p>
+      </div>
+    </div>
+
+    <!-- ===== TOOL UI ===== -->
+    <section class="tool-section">
+      <div class="container">
+        <div class="tool-grid">
+          <!-- Left: Controls -->
+          <div class="control-panel">
+            <h3>Upload &amp; Resize</h3>
+
+            <!-- Upload area -->
+            <div class="upload-area" id="uploadArea">
+              <span class="icon">📤</span>
+              <p><strong>Click or drag</strong> to upload an image</p>
+              <p style="font-size:0.8rem; margin-top:4px;">Supports JPG, JPEG, PNG, WebP</p>
+              <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" />
+            </div>
+
+            <!-- Dimension inputs -->
+            <div class="dimension-controls">
+              <label>
+                Width (px)
+                <input type="number" id="widthInput" min="1" step="1" value="800" />
+              </label>
+              <label>
+                Height (px)
+                <input type="number" id="heightInput" min="1" step="1" value="600" />
+              </label>
+            </div>
+
+            <!-- Aspect ratio checkbox -->
+            <div class="checkbox-group">
+              <input type="checkbox" id="aspectCheck" checked />
+              <label for="aspectCheck">🔒 Keep aspect ratio</label>
+            </div>
+
+            <!-- Original dimensions display -->
+            <div style="margin-bottom:16px; font-size:0.9rem; color:var(--text-secondary);">
+              Original: <span id="origDims">—</span>
+            </div>
+
+            <!-- Download button -->
+            <div class="download-area">
+              <button class="btn btn-primary" id="downloadBtn" disabled>
+                ⬇️ Download Resized Image
+              </button>
+            </div>
+          </div>
+
+          <!-- Right: Previews -->
+          <div class="preview-area">
+            <div class="preview-box">
+              <h4>Original</h4>
+              <div class="image-wrapper" id="origPreview">
+                <span style="color:var(--text-muted);">No image uploaded</span>
+              </div>
+              <div class="dimensions-info" id="origInfo">—</div>
+            </div>
+
+            <div class="preview-box">
+              <h4>Resized</h4>
+              <div class="image-wrapper" id="resizedPreview">
+                <span style="color:var(--text-muted);">Waiting for image</span>
+              </div>
+              <div class="dimensions-info" id="resizedInfo">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ===== FOOTER ===== -->
+  <footer class="footer" id="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <a href="index.html" class="logo">Tool<span>Nova</span></a>
+          <p>100% free online tools for students, professionals, developers, and designers.</p>
+          <div class="footer-social">
+            <a href="#" aria-label="Twitter" title="Twitter">🐦</a>
+            <a href="#" aria-label="GitHub" title="GitHub">🐙</a>
+            <a href="#" aria-label="YouTube" title="YouTube">▶️</a>
+            <a href="#" aria-label="Discord" title="Discord">💬</a>
+          </div>
+        </div>
+        <div class="footer-col">
+          <h5>Company</h5>
+          <a href="#">About</a>
+          <a href="#">Contact</a>
+          <a href="#">Sitemap</a>
+        </div>
+        <div class="footer-col">
+          <h5>Legal</h5>
+          <a href="#">Privacy Policy</a>
+          <a href="#">Terms</a>
+          <a href="#">Disclaimer</a>
+        </div>
+        <div class="footer-col">
+          <h5>Tools</h5>
+          <a href="image-resizer.html">Image Resizer</a>
+          <a href="#">PDF Tools</a>
+          <a href="#">Image Tools</a>
+          <a href="#">Text Tools</a>
+        </div>
+        <div class="footer-col">
+          <h5>Resources</h5>
+          <a href="#">Blog</a>
+          <a href="#">Guides</a>
+          <a href="#">API</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        &copy; 2026 ToolNova. All rights reserved.
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    // ================================================================
+    // THEME TOGGLE
+    // ================================================================
+    (function initTheme() {
+      const toggle = document.getElementById('themeToggle');
+      const icon = document.getElementById('themeIcon');
+      const stored = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = stored || (prefersDark ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+      icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+
+      toggle.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'dark' ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        icon.textContent = next === 'dark' ? '☀️' : '🌙';
+      });
+    })();
+
+    // ================================================================
+    // MOBILE MENU
+    // ================================================================
+    (function initMenu() {
+      const hamburger = document.getElementById('hamburger');
+      const navLinks = document.getElementById('navLinks');
+      hamburger.addEventListener('click', () => {
+        const isOpen = navLinks.classList.toggle('open');
+        hamburger.classList.toggle('active');
+        hamburger.setAttribute('aria-expanded', isOpen);
+      });
+      navLinks.querySelectorAll('a').forEach(link => {
+        link.addEventListener('click', () => {
+          navLinks.classList.remove('open');
+          hamburger.classList.remove('active');
+          hamburger.setAttribute('aria-expanded', 'false');
+        });
+      });
+    })();
+
+    // ================================================================
+    // IMAGE RESIZER LOGIC
+    // ================================================================
+    (function() {
+      // DOM refs
+      const fileInput = document.getElementById('fileInput');
+      const uploadArea = document.getElementById('uploadArea');
+      const widthInput = document.getElementById('widthInput');
+      const heightInput = document.getElementById('heightInput');
+      const aspectCheck = document.getElementById('aspectCheck');
+      const origDims = document.getElementById('origDims');
+      const origPreview = document.getElementById('origPreview');
+      const resizedPreview = document.getElementById('resizedPreview');
+      const origInfo = document.getElementById('origInfo');
+      const resizedInfo = document.getElementById('resizedInfo');
+      const downloadBtn = document.getElementById('downloadBtn');
+
+      let originalImage = null;      // HTMLImageElement
+      let originalWidth = 0;
+      let originalHeight = 0;
+      let resizedDataURL = null;     // result from canvas
+
+      // ----- helpers -----
+      function updateOrigPreview() {
+        if (!originalImage) {
+          origPreview.innerHTML = `<span style="color:var(--text-muted);">No image uploaded</span>`;
+          origInfo.textContent = '—';
+          origDims.textContent = '—';
+          return;
+        }
+        // clear and add img
+        origPreview.innerHTML = '';
+        const clone = originalImage.cloneNode();
+        clone.style.maxWidth = '100%';
+        clone.style.maxHeight = '300px';
+        clone.style.objectFit = 'contain';
+        origPreview.appendChild(clone);
+        origDims.textContent = `${originalWidth} × ${originalHeight}`;
+        origInfo.textContent = `${originalWidth} × ${originalHeight}`;
+      }
+
+      function performResize() {
+        if (!originalImage) {
+          resizedPreview.innerHTML = `<span style="color:var(--text-muted);">Waiting for image</span>`;
+          resizedInfo.textContent = '—';
+          resizedDataURL = null;
+          downloadBtn.disabled = true;
+          return;
+        }
+
+        // get target dimensions
+        let targetW = parseInt(widthInput.value, 10);
+        let targetH = parseInt(heightInput.value, 10);
+        if (isNaN(targetW) || targetW < 1) targetW = 1;
+        if (isNaN(targetH) || targetH < 1) targetH = 1;
+
+        // aspect ratio lock: if checked, adjust height based on width (or vice versa)
+        if (aspectCheck.checked && originalWidth > 0 && originalHeight > 0) {
+          // We need to decide which dimension to adjust.
+          // If user changed width, adjust height; else adjust width.
+          // We'll just recalc height from width, but also check if width was manually changed.
+          // A simple approach: always keep aspect ratio based on original, but we need to know which dimension the user edited.
+          // We'll use a heuristic: if the width input is the one that changed (detected by focus or change), but we'll just base on width.
+          // Common practice: lock based on width.
+          targetH = Math.round(targetW * (originalHeight / originalWidth));
+          heightInput.value = targetH;
+        }
+
+        // clamp to at least 1
+        targetW = Math.max(1, targetW);
+        targetH = Math.max(1, targetH);
+
+        // create canvas and draw scaled image
+        const canvas = document.createElement('canvas');
+        canvas.width = targetW;
+        canvas.height = targetH;
+        const ctx = canvas.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(originalImage, 0, 0, targetW, targetH);
+
+        // produce data URL
+        resizedDataURL = canvas.toDataURL('image/png'); // default to PNG for quality, but we can also offer JPG? We'll keep PNG.
+        // Update preview
+        const img = new Image();
+        img.onload = function() {
+          resizedPreview.innerHTML = '';
+          img.style.maxWidth = '100%';
+          img.style.maxHeight = '300px';
+          img.style.objectFit = 'contain';
+          resizedPreview.appendChild(img);
+          resizedInfo.textContent = `${targetW} × ${targetH}`;
+          downloadBtn.disabled = false;
+        };
+        img.src = resizedDataURL;
+      }
+
+      // ----- event listeners -----
+      // file input change
+      fileInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(ev) {
+          const img = new Image();
+          img.onload = function() {
+            originalImage = img;
+            originalWidth = img.width;
+            originalHeight = img.height;
+            // set initial dimensions to original (or keep current? we'll set to original)
+            widthInput.value = img.width;
+            heightInput.value = img.height;
+            // update original preview
+            updateOrigPreview();
+            // perform resize (will set preview)
+            performResize();
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+
+      // drag & drop
+      uploadArea.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        uploadArea.classList.add('dragover');
+      });
+      uploadArea.addEventListener('dragleave', function() {
+        uploadArea.classList.remove('dragover');
+      });
+      uploadArea.addEventListener('drop', function(e) {
+        e.preventDefault();
+        uploadArea.classList.remove('dragover');
+        const files = e.dataTransfer.files;
+        if (files.length > 0) {
+          fileInput.files = files;
+          fileInput.dispatchEvent(new Event('change'));
+        }
+      });
+      // click to open file picker
+      uploadArea.addEventListener('click', function() {
+        fileInput.click();
+      });
+
+      // dimension inputs
+      widthInput.addEventListener('input', function() {
+        if (!originalImage) return;
+        const val = parseInt(this.value, 10);
+        if (isNaN(val) || val < 1) return;
+        if (aspectCheck.checked) {
+          const newH = Math.round(val * (originalHeight / originalWidth));
+          heightInput.value = newH;
+        }
+        performResize();
+      });
+
+      heightInput.addEventListener('input', function() {
+        if (!originalImage) return;
+        const val = parseInt(this.value, 10);
+        if (isNaN(val) || val < 1) return;
+        if (aspectCheck.checked) {
+          const newW = Math.round(val * (originalWidth / originalHeight));
+          widthInput.value = newW;
+        }
+        performResize();
+      });
+
+      // aspect checkbox: when toggled, recalc if needed
+      aspectCheck.addEventListener('change', function() {
+        if (this.checked && originalImage) {
+          // update height based on current width
+          const w = parseInt(widthInput.value, 10);
+          if (!isNaN(w) && w > 0) {
+            const newH = Math.round(w * (originalHeight / originalWidth));
+            heightInput.value = newH;
+          }
+          performResize();
+        } else {
+          performResize(); // just refresh
+        }
+      });
+
+      // download button
+      downloadBtn.addEventListener('click', function() {
+        if (!resizedDataURL) return;
+        // get file extension based on original file type? We'll use PNG by default, but we can try to preserve.
+        // For simplicity, we'll download as PNG. Could also detect original type and use that.
+        const a = document.createElement('a');
+        a.href = resizedDataURL;
+        // derive filename from original if possible
+        let fileName = 'resized-image.png';
+        if (fileInput.files.length > 0) {
+          const origName = fileInput.files[0].name;
+          const ext = origName.split('.').pop();
+          if (ext) {
+            // we could use the same extension, but canvas.toDataURL can only output PNG or JPEG.
+            // We'll default to PNG.
+            fileName = origName.replace(/\.[^.]+$/, '') + '_resized.png';
+          }
+        }
+        a.download = fileName;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+
+      // initial state
+      updateOrigPreview();
+      performResize();
+    })();
+  </script>
+
+</body>
+  </html>
