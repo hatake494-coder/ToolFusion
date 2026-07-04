@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -52,10 +53,12 @@
         }
     </script>
 
-    <!-- Libraries -->
+    <!-- QRCode.js (unchanged) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
     </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsBarcode/3.11.6/JsBarcode.all.min.js">
+
+    <!-- ===== FIXED: JsBarcode library from reliable CDN ===== -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js">
     </script>
 
     <style>
@@ -1524,10 +1527,16 @@
             });
 
             // ============================================================
-            // BARCODE GENERATE
+            // BARCODE GENERATE (FIXED with JsBarcode check)
             // ============================================================
 
             function generateBarcode() {
+                // Check if JsBarcode is loaded
+                if (typeof JsBarcode === 'undefined') {
+                    showBarcodeMsg('Barcode library failed to load. Please refresh the page and try again.', 'error');
+                    return;
+                }
+
                 const data = barcodeInput.value.trim();
                 if (!data) {
                     showBarcodeMsg('Please enter data for the barcode.', 'error');
@@ -1754,11 +1763,9 @@
                 initMenu();
                 initNavbarScroll();
 
-                // Trigger initial QR generation with placeholder? No, wait for user.
-                // Set initial color for dark mode awareness
+                // Update color defaults for dark mode
                 const updateColor = () => {
                     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-                    // QR color default
                     if (!qrColor.value || qrColor.value === '#0b1a33') {
                         qrColor.value = isDark ? '#f0f4ff' : '#0b1a33';
                     }
@@ -1766,7 +1773,6 @@
                         barcodeColor.value = isDark ? '#f0f4ff' : '#0b1a33';
                     }
                 };
-                // Observe theme changes
                 const observer = new MutationObserver(() => updateColor());
                 observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
                 updateColor();
