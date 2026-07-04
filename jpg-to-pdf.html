@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1359,16 +1360,16 @@
         })();
 
         // ================================================================
-        // PDF CONVERTER LOGIC
+        // PDF CONVERTER LOGIC — FIXED
         // ================================================================
         (function() {
             // ---- State ----
             const state = {
-                mode: 'jpg-to-pdf', // jpg-to-pdf | pdf-to-jpg | png-to-pdf | webp-to-pdf | pdf-to-png
-                files: [], // Array of { id, file, dataURL, name, size, type, width, height, pages? }
+                mode: 'jpg-to-pdf',
+                files: [],
                 isProcessing: false,
                 progress: 0,
-                convertedData: null, // Blob or Array of Blobs
+                convertedData: null,
             };
 
             // ---- DOM refs ----
@@ -1388,7 +1389,6 @@
             const progressText = document.getElementById('progressText');
             const downloadBtn = document.getElementById('downloadBtn');
             const clearBtn = document.getElementById('clearBtn');
-            const previewBox = document.getElementById('previewBox');
             const placeholder = document.getElementById('placeholder');
             const previewGrid = document.getElementById('previewGrid');
 
@@ -1406,6 +1406,7 @@
                     multiple: true,
                     showSettings: true,
                     outputExt: 'pdf',
+                    imgFormat: 'JPEG',
                 },
                 'pdf-to-jpg': {
                     label: 'PDF → JPG',
@@ -1417,6 +1418,7 @@
                     multiple: false,
                     showSettings: false,
                     outputExt: 'zip',
+                    imgFormat: null,
                 },
                 'png-to-pdf': {
                     label: 'PNG → PDF',
@@ -1428,6 +1430,7 @@
                     multiple: true,
                     showSettings: true,
                     outputExt: 'pdf',
+                    imgFormat: 'PNG',
                 },
                 'webp-to-pdf': {
                     label: 'WebP → PDF',
@@ -1439,6 +1442,7 @@
                     multiple: true,
                     showSettings: true,
                     outputExt: 'pdf',
+                    imgFormat: 'WEBP',
                 },
                 'pdf-to-png': {
                     label: 'PDF → PNG',
@@ -1450,6 +1454,7 @@
                     multiple: false,
                     showSettings: false,
                     outputExt: 'zip',
+                    imgFormat: null,
                 },
             };
 
@@ -1472,11 +1477,6 @@
                 return ['pdf-to-jpg', 'pdf-to-png'].includes(state.mode);
             }
 
-            function getOutputExtension() {
-                const cfg = getModeConfig();
-                return cfg.outputExt;
-            }
-
             // ---- UI Updates ----
             function updateModeUI() {
                 const cfg = getModeConfig();
@@ -1486,20 +1486,15 @@
                 fileInput.accept = cfg.accept;
                 fileInput.multiple = cfg.multiple;
 
-                // Settings visibility
                 settingsRow.style.display = cfg.showSettings ? 'grid' : 'none';
 
-                // Update tabs
                 document.querySelectorAll('.mode-tab').forEach(tab => {
                     const mode = tab.dataset.mode;
                     tab.classList.toggle('active', mode === state.mode);
                     tab.setAttribute('aria-selected', mode === state.mode);
                 });
 
-                // Update button text
                 updateButtonText();
-
-                // Clear state
                 clearAllFiles();
             }
 
@@ -1515,8 +1510,14 @@
                     downloadBtn.disabled = true;
                     return;
                 }
-                const label = cfg.label.split('→')[0].trim() + ' → ' + cfg.label.split('→')[1].trim();
-                downloadBtn.textContent = `⬇️ Download ${label}`;
+                if (state.convertedData) {
+                    const ext = state.convertedData.fileName.split('.').pop().toUpperCase();
+                    downloadBtn.textContent = `⬇️ Download ${ext}`;
+                    downloadBtn.disabled = false;
+                    return;
+                }
+                const target = cfg.label.split('→')[1].trim();
+                downloadBtn.textContent = `🔄 Convert to ${target}`;
                 downloadBtn.disabled = false;
             }
 
@@ -1527,13 +1528,13 @@
                     previewGrid.style.display = 'none';
                     placeholder.style.display = 'block';
                     clearBtn.disabled = true;
+                    state.convertedData = null;
                     updateButtonText();
                     return;
                 }
 
                 clearBtn.disabled = false;
 
-                // Build file list
                 let html = '';
                 state.files.forEach((f, index) => {
                     const isImage = f.type && f.type.startsWith('image/');
@@ -1555,7 +1556,6 @@
                 });
                 fileList.innerHTML = html;
 
-                // Update file info
                 const totalSize = state.files.reduce((sum, f) => sum + f.size, 0);
                 const imgCount = state.files.filter(f => f.type && f.type.startsWith('image/')).length;
                 const pdfCount = state.files.filter(f => f.type === 'application/pdf').length;
@@ -1564,13 +1564,8 @@
                 if (pdfCount > 0) infoText += ` · ${pdfCount} PDF(s)`;
                 fileInfo.innerHTML = infoText;
 
-                // Update preview
                 updatePreview();
-
-                // Update button
                 updateButtonText();
-
-                // Setup drag events
                 setupDragEvents();
                 setupRemoveEvents();
             }
@@ -1579,13 +1574,13 @@
                 const imageFiles = state.files.filter(f => f.type && f.type.startsWith('image/') && f.dataURL);
 
                 if (imageFiles.length === 0 && state.files.length > 0) {
-                    // PDF preview: show first page if available
                     const pdfFile = state.files.find(f => f.type === 'application/pdf');
                     if (pdfFile && pdfFile.pages) {
                         placeholder.style.display = 'none';
                         previewGrid.style.display = 'grid';
                         let html = '';
-                        for (let i = 0; i < Math.min(pdfFile.pages, 6); i++) {
+                        const show = Math.min(pdfFile.pages, 8);
+                        for (let i = 0; i < show; i++) {
                             html += `
                     <div class="page-item">
                       <div style="padding:20px;text-align:center;color:var(--text-muted);font-size:0.8rem;">
@@ -1650,6 +1645,7 @@
                             const [moved] = files.splice(dragIndex, 1);
                             files.splice(targetIndex, 0, moved);
                             state.files = files;
+                            state.convertedData = null;
                             updateFileList();
                         }
                     });
@@ -1661,10 +1657,9 @@
                     btn.addEventListener('click', () => {
                         const id = parseInt(btn.dataset.id);
                         state.files = state.files.filter(f => f.id !== id);
+                        state.convertedData = null;
                         updateFileList();
-                        // Reset download if no files
                         if (state.files.length === 0) {
-                            state.convertedData = null;
                             downloadBtn.disabled = true;
                         }
                     });
@@ -1679,7 +1674,6 @@
                 const isImageMode = isImageToPdfMode();
                 const isPdfMode = isPdfToImageMode();
 
-                // Filter files based on mode
                 let validFiles = [];
                 for (const file of files) {
                     if (isImageMode && file.type && file.type.startsWith('image/')) {
@@ -1698,13 +1692,15 @@
                     return;
                 }
 
-                // For PDF modes, only allow one file
                 if (isPdfMode && validFiles.length > 1) {
                     alert('Only one PDF file can be uploaded at a time.');
                     validFiles = [validFiles[0]];
                 }
 
-                // Process each file
+                if (isPdfMode) {
+                    state.files = [];
+                }
+
                 let processed = 0;
                 const total = validFiles.length;
 
@@ -1724,41 +1720,52 @@
                             pages: null,
                         };
 
-                        // For images, get dimensions
                         if (file.type && file.type.startsWith('image/')) {
                             const img = new Image();
+                            // FIX: set handlers before src to avoid race condition
                             img.onload = function() {
                                 fileData.width = img.width;
                                 fileData.height = img.height;
                                 state.files.push(fileData);
                                 processed++;
                                 if (processed === total) {
+                                    state.convertedData = null;
                                     updateFileList();
-                                    // Auto-convert for image modes? No, wait for user click.
-                                    // But we enable the download button.
+                                    updateButtonText();
+                                }
+                            };
+                            img.onerror = function() {
+                                // Fallback: push without dimensions
+                                fileData.width = 0;
+                                fileData.height = 0;
+                                state.files.push(fileData);
+                                processed++;
+                                if (processed === total) {
+                                    state.convertedData = null;
+                                    updateFileList();
                                     updateButtonText();
                                 }
                             };
                             img.src = dataURL;
                         } else if (file.type === 'application/pdf') {
-                            // For PDF, we'll get page count later during conversion
                             state.files.push(fileData);
                             processed++;
                             if (processed === total) {
-                                // Try to get page count with PDF.js
                                 getPdfPageCount(fileData).then(() => {
+                                    state.convertedData = null;
                                     updateFileList();
                                     updateButtonText();
                                 }).catch(() => {
+                                    state.convertedData = null;
                                     updateFileList();
                                     updateButtonText();
                                 });
                             }
                         } else {
-                            // Fallback
                             state.files.push(fileData);
                             processed++;
                             if (processed === total) {
+                                state.convertedData = null;
                                 updateFileList();
                                 updateButtonText();
                             }
@@ -1767,21 +1774,14 @@
                     reader.readAsDataURL(file);
                 });
 
-                // If no valid files were added (edge case)
-                if (validFiles.length === 0) {
-                    return;
-                }
-
-                // Reset file input
+                if (validFiles.length === 0) return;
                 fileInput.value = '';
             }
 
             async function getPdfPageCount(fileData) {
                 try {
                     const pdfjsLib = window.pdfjsLib;
-                    // Set worker
                     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
                     const pdf = await pdfjsLib.getDocument({ data: fileData.dataURL }).promise;
                     fileData.pages = pdf.numPages;
                     return pdf.numPages;
@@ -1792,7 +1792,7 @@
                 }
             }
 
-            // ---- Conversion logic ----
+            // ---- Conversion ----
             async function performConversion() {
                 if (state.isProcessing) return;
                 if (state.files.length === 0) return;
@@ -1813,8 +1813,8 @@
                     }
                 } catch (error) {
                     console.error('Conversion error:', error);
-                    progressText.textContent = '❌ Error: ' + error.message;
-                    alert('An error occurred during conversion. Please try again.');
+                    progressText.textContent = '❌ Error: ' + (error.message || 'Unknown error');
+                    alert('An error occurred during conversion. Please try again.\n\nDetails: ' + (error.message || 'Unknown'));
                 } finally {
                     state.isProcessing = false;
                     progressFill.style.width = '100%';
@@ -1828,7 +1828,7 @@
                 }
             }
 
-            // ---- Image → PDF ----
+            // ---- Image → PDF (FIXED) ----
             async function convertImagesToPdf() {
                 const imageFiles = state.files.filter(f => f.type && f.type.startsWith('image/') && f.dataURL);
                 if (imageFiles.length === 0) {
@@ -1837,8 +1837,9 @@
 
                 const orientation = orientationSelect.value;
                 const paperSize = paperSizeSelect.value;
+                const cfg = getModeConfig();
+                const imgFormat = cfg.imgFormat || 'JPEG';
 
-                // Paper sizes in mm (jsPDF uses mm)
                 const sizes = {
                     a4: { portrait: [210, 297], landscape: [297, 210] },
                     letter: { portrait: [215.9, 279.4], landscape: [279.4, 215.9] },
@@ -1853,46 +1854,57 @@
                 for (let i = 0; i < total; i++) {
                     const f = imageFiles[i];
                     const img = new Image();
-                    img.src = f.dataURL;
+
+                    // FIX: load image with proper event ordering
                     await new Promise((resolve, reject) => {
                         img.onload = resolve;
-                        img.onerror = reject;
+                        img.onerror = () => reject(new Error(`Failed to load image: ${f.name}`));
+                        img.src = f.dataURL;
                     });
 
-                    // Calculate aspect ratio to fit page
+                    // Validate image dimensions
+                    if (!img.width || !img.height || img.width === 0 || img.height === 0) {
+                        throw new Error(`Invalid image dimensions (${img.width}×${img.height}) for: ${f.name}`);
+                    }
+
                     const imgAspect = img.width / img.height;
                     const pageAspect = dims[0] / dims[1];
 
                     let imgWidth, imgHeight;
                     if (imgAspect > pageAspect) {
-                        imgWidth = dims[0] - 20; // margins
+                        imgWidth = dims[0] - 20;
                         imgHeight = imgWidth / imgAspect;
                     } else {
                         imgHeight = dims[1] - 20;
                         imgWidth = imgHeight * imgAspect;
                     }
 
-                    // Center on page
                     const x = (dims[0] - imgWidth) / 2;
                     const y = (dims[1] - imgHeight) / 2;
 
-                    if (i > 0) {
-                        pdf.addPage();
+                    if (i > 0) pdf.addPage();
+
+                    // Add the image to the PDF — use the img element or data URL
+                    try {
+                        // Use the HTMLImageElement directly — more reliable
+                        pdf.addImage(img, imgFormat, x, y, imgWidth, imgHeight);
+                    } catch (addErr) {
+                        // Fallback: try using the data URL
+                        try {
+                            pdf.addImage(f.dataURL, imgFormat, x, y, imgWidth, imgHeight);
+                        } catch (fallbackErr) {
+                            throw new Error(`Failed to add image "${f.name}" to PDF: ${fallbackErr.message}`);
+                        }
                     }
 
-                    pdf.addImage(f.dataURL, 'JPEG', x, y, imgWidth, imgHeight);
-
-                    // Update progress
                     state.progress = ((i + 1) / total) * 100;
                     progressFill.style.width = state.progress + '%';
                     progressText.textContent = `Processing ${i+1}/${total} images...`;
                 }
 
-                // Generate PDF blob
                 const pdfBlob = pdf.output('blob');
                 const fileName = `converted_${Date.now()}.pdf`;
                 state.convertedData = { blob: pdfBlob, fileName, type: 'application/pdf' };
-
                 progressText.textContent = '✅ Conversion complete!';
             }
 
@@ -1941,7 +1953,6 @@
                     progressText.textContent = `Converting page ${i}/${total}...`;
                 }
 
-                // If single page, download directly
                 if (blobs.length === 1) {
                     const b = blobs[0];
                     const fileName = `page_1.${ext}`;
@@ -1950,7 +1961,6 @@
                     return;
                 }
 
-                // Multiple pages: create zip
                 const zip = new JSZip();
                 blobs.forEach((b, idx) => {
                     const fileName = `page_${idx+1}.${ext}`;
@@ -1960,14 +1970,13 @@
                 const zipBlob = await zip.generateAsync({ type: 'blob' });
                 const zipName = `converted_${Date.now()}.zip`;
                 state.convertedData = { blob: zipBlob, fileName: zipName, type: 'application/zip' };
-
                 progressText.textContent = '✅ Conversion complete!';
             }
 
             // ---- Download ----
             function handleDownload() {
                 if (!state.convertedData) return;
-                const { blob, fileName, type } = state.convertedData;
+                const { blob, fileName } = state.convertedData;
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -1992,7 +2001,6 @@
             }
 
             // ---- Event listeners ----
-            // Mode tabs
             modeTabs.addEventListener('click', (e) => {
                 const tab = e.target.closest('.mode-tab');
                 if (!tab) return;
@@ -2003,7 +2011,6 @@
                 clearAllFiles();
             });
 
-            // Upload area
             uploadArea.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 uploadArea.classList.add('dragover');
@@ -2023,7 +2030,6 @@
                 fileInput.click();
             });
 
-            // File input
             fileInput.addEventListener('change', (e) => {
                 const files = e.target.files;
                 if (files.length > 0) {
@@ -2031,7 +2037,6 @@
                 }
             });
 
-            // Download button
             downloadBtn.addEventListener('click', () => {
                 if (state.convertedData) {
                     handleDownload();
@@ -2040,10 +2045,8 @@
                 }
             });
 
-            // Clear button
             clearBtn.addEventListener('click', clearAllFiles);
 
-            // Settings change - re-convert if files present
             orientationSelect.addEventListener('change', () => {
                 if (state.files.length > 0 && isImageToPdfMode()) {
                     state.convertedData = null;
@@ -2063,7 +2066,6 @@
             updateModeUI();
             clearAllFiles();
 
-            // Expose for debugging
             window.__pdfConverter = { state, performConversion, handleDownload, clearAllFiles };
 
         })();
