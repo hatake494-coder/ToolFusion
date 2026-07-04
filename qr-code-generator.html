@@ -57,7 +57,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js">
     </script>
 
-    <!-- ===== FIXED: JsBarcode library from reliable CDN ===== -->
+    <!-- JsBarcode library from reliable CDN -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js">
     </script>
 
@@ -610,15 +610,13 @@
             width: 100%;
             overflow: auto;
             padding: 8px 0;
-        }
-        .preview-area #barcodeContainer svg {
-            max-width: 100%;
-            height: auto;
-            max-height: 160px;
+            min-height: 120px;
         }
         .preview-area #barcodeContainer canvas {
             max-width: 100%;
-            max-height: 160px;
+            max-height: 200px;
+            border-radius: 4px;
+            background: #ffffff;
         }
 
         .preview-actions {
@@ -855,6 +853,9 @@
             .tool-panel .panel-title {
                 font-size: 1rem;
             }
+            .preview-area #barcodeContainer canvas {
+                max-height: 140px;
+            }
         }
 
         /* ===== Utilities ===== */
@@ -976,7 +977,7 @@
                     <button class="tab-btn" role="tab" aria-selected="false" data-tab="barcode">📊 Barcode</button>
                 </div>
 
-                <!-- ===== TAB 1: QR CODE ===== -->
+                <!-- ===== TAB 1: QR CODE (UNCHANGED) ===== -->
                 <div class="tab-content active" id="tab-qr" role="tabpanel">
                     <div class="tool-panel">
                         <div class="panel-title">📱 Generate QR Code</div>
@@ -999,7 +1000,7 @@
                             <div class="hint" id="qrInputHint">Enter the text or data you want to encode.</div>
                         </div>
 
-                        <!-- Wi-Fi fields (hidden by default) -->
+                        <!-- Wi-Fi fields -->
                         <div id="wifiFields" style="display:none;">
                             <div class="form-row">
                                 <div class="form-group">
@@ -1021,7 +1022,7 @@
                             </div>
                         </div>
 
-                        <!-- SMS fields (hidden by default) -->
+                        <!-- SMS fields -->
                         <div id="smsFields" style="display:none;">
                             <div class="form-row">
                                 <div class="form-group">
@@ -1077,7 +1078,7 @@
                     </div>
                 </div>
 
-                <!-- ===== TAB 2: BARCODE ===== -->
+                <!-- ===== TAB 2: BARCODE (FIXED - Canvas rendering) ===== -->
                 <div class="tab-content" id="tab-barcode" role="tabpanel">
                     <div class="tool-panel">
                         <div class="panel-title">📊 Generate Barcode</div>
@@ -1103,7 +1104,7 @@
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label for="barcodeWidth">Width (px)</label>
+                                <label for="barcodeWidth">Bar Width (px)</label>
                                 <select id="barcodeWidth">
                                     <option value="1">1</option>
                                     <option value="2" selected>2</option>
@@ -1232,7 +1233,7 @@
                 barcode: document.getElementById('tab-barcode')
             };
 
-            // QR
+            // QR (unchanged)
             const qrType = document.getElementById('qrType');
             const qrInput = document.getElementById('qrInput');
             const qrInputHint = document.getElementById('qrInputHint');
@@ -1278,6 +1279,7 @@
 
             let currentQrData = null;
             let currentBarcodeData = null;
+            let barcodeCanvas = null; // store reference to canvas for download
 
             // ============================================================
             // TABS
@@ -1300,7 +1302,7 @@
             });
 
             // ============================================================
-            // QR TYPE CHANGE
+            // QR CODE (COMPLETELY UNCHANGED)
             // ============================================================
 
             qrType.addEventListener('change', function() {
@@ -1330,10 +1332,6 @@
                 }
             });
             qrType.dispatchEvent(new Event('change'));
-
-            // ============================================================
-            // QR GENERATE
-            // ============================================================
 
             function getQrData() {
                 const type = qrType.value;
@@ -1388,8 +1386,6 @@
                     showQrMsg('Please enter the required information.', 'error');
                     return;
                 }
-
-                // For text/url/email/phone, check empty
                 if (['text', 'url', 'email', 'phone'].includes(type) && !qrInput.value.trim()) {
                     showQrMsg('Please enter the required information.', 'error');
                     return;
@@ -1403,7 +1399,6 @@
                     return;
                 }
 
-                // Clear previous
                 qrCodeContainer.innerHTML = '';
                 qrMsg.className = 'msg';
                 qrMsg.textContent = '';
@@ -1441,7 +1436,6 @@
 
             generateQrBtn.addEventListener('click', generateQr);
 
-            // Enter key support for QR
             qrInput.addEventListener('keydown', function(e) {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
@@ -1465,10 +1459,6 @@
                     generateQr(); }
             });
 
-            // ============================================================
-            // QR CLEAR
-            // ============================================================
-
             clearQrBtn.addEventListener('click', function() {
                 qrInput.value = '';
                 wifiSsid.value = '';
@@ -1485,10 +1475,6 @@
                 currentQrData = null;
             });
 
-            // ============================================================
-            // QR DOWNLOAD
-            // ============================================================
-
             downloadQrBtn.addEventListener('click', function() {
                 const canvas = qrCodeContainer.querySelector('canvas');
                 if (!canvas) {
@@ -1503,10 +1489,6 @@
                 document.body.removeChild(link);
             });
 
-            // ============================================================
-            // QR COPY
-            // ============================================================
-
             copyQrBtn.addEventListener('click', function() {
                 if (!currentQrData) {
                     showQrMsg('No QR code data to copy. Generate one first.', 'error');
@@ -1515,7 +1497,6 @@
                 navigator.clipboard.writeText(currentQrData).then(() => {
                     showQrMsg('✅ Content copied to clipboard!', 'success');
                 }).catch(() => {
-                    // Fallback
                     const textarea = document.createElement('textarea');
                     textarea.value = currentQrData;
                     document.body.appendChild(textarea);
@@ -1527,13 +1508,13 @@
             });
 
             // ============================================================
-            // BARCODE GENERATE (FIXED with JsBarcode check)
+            // BARCODE GENERATOR (FIXED - Canvas rendering)
             // ============================================================
 
             function generateBarcode() {
                 // Check if JsBarcode is loaded
                 if (typeof JsBarcode === 'undefined') {
-                    showBarcodeMsg('Barcode library failed to load. Please refresh the page and try again.', 'error');
+                    showBarcodeMsg('Barcode library failed to load. Please refresh the page.', 'error');
                     return;
                 }
 
@@ -1549,46 +1530,98 @@
                 const color = barcodeColor.value;
                 const showText = barcodeShowText.checked;
 
+                // Clear previous
                 barcodeMsg.className = 'msg';
                 barcodeMsg.textContent = '';
+                barcodeContainer.innerHTML = '';
+                barcodeContainer.style.display = 'flex';
 
                 try {
-                    barcodeContainer.innerHTML = '';
-                    barcodeContainer.style.display = 'flex';
+                    // Create canvas element
+                    const canvas = document.createElement('canvas');
+                    canvas.id = 'barcodeCanvas';
+                    canvas.style.maxWidth = '100%';
+                    canvas.style.maxHeight = '200px';
+                    canvas.style.background = '#ffffff';
+                    canvas.style.borderRadius = '4px';
+                    barcodeContainer.appendChild(canvas);
 
-                    const svg = document.createElement('svg');
-                    svg.id = 'barcodeSvg';
-                    barcodeContainer.appendChild(svg);
-
-                    JsBarcode(svg, data, {
+                    // Render barcode on canvas using JsBarcode
+                    JsBarcode(canvas, data, {
                         format: format,
                         width: width,
                         height: height,
                         displayValue: showText,
-                        fontSize: 16,
+                        fontSize: 18,
                         font: 'monospace',
-                        textMargin: 4,
+                        textMargin: 6,
                         background: '#ffffff',
                         lineColor: color,
-                        margin: 8,
+                        margin: 10,
                         valid: function(valid) {
+                            // If invalid, the library will still try to render but we need to check
                             if (!valid) {
-                                showBarcodeMsg('Invalid data for the selected barcode format. Please check the format requirements.', 'error');
-                                barcodeContainer.style.display = 'none';
-                                barcodePlaceholder.style.display = 'block';
+                                // We'll handle this in the try-catch or by checking canvas content
                             }
                         }
                     });
 
-                    // Check if SVG has content
-                    if (svg.children.length === 0) {
+                    // Check if canvas has been drawn (has content)
+                    // JsBarcode renders synchronously, so we can check immediately
+                    const ctx = canvas.getContext('2d');
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const pixels = imageData.data;
+                    let hasContent = false;
+                    // Check if there's any non-white pixel
+                    for (let i = 0; i < pixels.length; i += 4) {
+                        if (pixels[i] < 250 || pixels[i + 1] < 250 || pixels[i + 2] < 250) {
+                            hasContent = true;
+                            break;
+                        }
+                    }
+
+                    if (!hasContent || canvas.width === 0 || canvas.height === 0) {
+                        // Check if it's a format-specific validation issue
+                        let formatHint = '';
+                        switch (format) {
+                            case 'EAN13':
+                                formatHint = 'EAN-13 requires exactly 12 or 13 digits.';
+                                break;
+                            case 'EAN8':
+                                formatHint = 'EAN-8 requires exactly 7 or 8 digits.';
+                                break;
+                            case 'UPCA':
+                                formatHint = 'UPC-A requires exactly 11 or 12 digits.';
+                                break;
+                            case 'UPCE':
+                                formatHint = 'UPC-E requires exactly 6, 7, or 8 digits.';
+                                break;
+                            case 'CODE39':
+                                formatHint = 'Code39 supports A-Z, 0-9, and a few special characters (- . $ / + % * space).';
+                                break;
+                            case 'ITF':
+                                formatHint = 'ITF requires an even number of digits.';
+                                break;
+                            case 'CODABAR':
+                                formatHint = 'Codabar supports digits 0-9 and special characters (- $ : / . +).';
+                                break;
+                            case 'CODE128':
+                                formatHint = 'Code128 supports all ASCII characters (0-127).';
+                                break;
+                            default:
+                                formatHint = 'Please check the format requirements.';
+                        }
+                        showBarcodeMsg('Invalid data for ' + format + '. ' + formatHint, 'error');
                         barcodeContainer.style.display = 'none';
                         barcodePlaceholder.style.display = 'block';
-                        showBarcodeMsg('Invalid data for the selected barcode format.', 'error');
                         return;
                     }
 
+                    // Success - store reference for download
+                    barcodeCanvas = canvas;
                     currentBarcodeData = data;
+
+                    // Update UI
                     barcodePlaceholder.style.display = 'none';
                     barcodeContainer.style.display = 'flex';
                     barcodeActions.style.display = 'flex';
@@ -1597,7 +1630,15 @@
                     showBarcodeMsg('✅ Barcode generated successfully!', 'success');
 
                 } catch (err) {
-                    showBarcodeMsg('Error generating barcode: ' + err.message, 'error');
+                    // Check if it's a known format error
+                    let errorMsg = err.message || 'Unknown error';
+                    if (errorMsg.includes('format')) {
+                        showBarcodeMsg('Invalid data for ' + format + '. Please check the format requirements.', 'error');
+                    } else {
+                        showBarcodeMsg('Error generating barcode: ' + errorMsg, 'error');
+                    }
+                    barcodeContainer.style.display = 'none';
+                    barcodePlaceholder.style.display = 'block';
                 }
             }
 
@@ -1629,47 +1670,36 @@
                 barcodeMsg.className = 'msg';
                 barcodeMsg.textContent = '';
                 currentBarcodeData = null;
+                barcodeCanvas = null;
             });
 
             // ============================================================
-            // BARCODE DOWNLOAD
+            // BARCODE DOWNLOAD (FIXED - uses canvas)
             // ============================================================
 
             downloadBarcodeBtn.addEventListener('click', function() {
-                const svg = document.getElementById('barcodeSvg');
-                if (!svg || svg.children.length === 0) {
-                    showBarcodeMsg('No barcode to download. Generate one first.', 'error');
-                    return;
+                if (!barcodeCanvas) {
+                    // Try to find canvas in container
+                    const canvas = barcodeContainer.querySelector('canvas');
+                    if (canvas) {
+                        barcodeCanvas = canvas;
+                    } else {
+                        showBarcodeMsg('No barcode to download. Generate one first.', 'error');
+                        return;
+                    }
                 }
 
-                // Convert SVG to canvas
-                const svgData = new XMLSerializer().serializeToString(svg);
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-
-                const img = new Image();
-                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(svgBlob);
-
-                img.onload = function() {
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    URL.revokeObjectURL(url);
-
+                try {
                     const link = document.createElement('a');
                     link.download = 'barcode.png';
-                    link.href = canvas.toDataURL('image/png');
+                    link.href = barcodeCanvas.toDataURL('image/png');
                     document.body.appendChild(link);
                     link.click();
                     document.body.removeChild(link);
-                };
-
-                img.onerror = function() {
-                    showBarcodeMsg('Failed to render barcode for download.', 'error');
-                };
-
-                img.src = url;
+                    showBarcodeMsg('✅ Barcode downloaded successfully!', 'success');
+                } catch (err) {
+                    showBarcodeMsg('Failed to download barcode: ' + err.message, 'error');
+                }
             });
 
             // ============================================================
