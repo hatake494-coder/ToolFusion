@@ -1360,13 +1360,13 @@
         })();
 
         // ================================================================
-        // PDF CONVERTER LOGIC — FIXED
+        // PDF CONVERTER LOGIC – FIXED PDF → IMAGES
         // ================================================================
         (function() {
             // ---- State ----
             const state = {
                 mode: 'jpg-to-pdf',
-                files: [],
+                files: [], // each: { id, file, dataURL (for images), arrayBuffer (for PDF), name, size, type, width, height, pages }
                 isProcessing: false,
                 progress: 0,
                 convertedData: null,
@@ -1666,7 +1666,7 @@
                 });
             }
 
-            // ---- File upload ----
+            // ---- File upload — store ArrayBuffer for PDF ----
             function handleFiles(files) {
                 if (!files || files.length === 0) return;
 
@@ -1705,24 +1705,24 @@
                 const total = validFiles.length;
 
                 validFiles.forEach(file => {
-                    const reader = new FileReader();
-                    reader.onload = function(e) {
-                        const dataURL = e.target.result;
-                        const fileData = {
-                            id: ++fileIdCounter,
-                            file: file,
-                            dataURL: dataURL,
-                            name: file.name,
-                            size: file.size,
-                            type: file.type,
-                            width: null,
-                            height: null,
-                            pages: null,
-                        };
+                    const fileData = {
+                        id: ++fileIdCounter,
+                        file: file,
+                        name: file.name,
+                        size: file.size,
+                        type: file.type,
+                        width: null,
+                        height: null,
+                        pages: null,
+                        dataURL: null,
+                        arrayBuffer: null,
+                    };
 
-                        if (file.type && file.type.startsWith('image/')) {
+                    if (file.type && file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            fileData.dataURL = e.target.result;
                             const img = new Image();
-                            // FIX: set handlers before src to avoid race condition
                             img.onload = function() {
                                 fileData.width = img.width;
                                 fileData.height = img.height;
@@ -1735,7 +1735,6 @@
                                 }
                             };
                             img.onerror = function() {
-                                // Fallback: push without dimensions
                                 fileData.width = 0;
                                 fileData.height = 0;
                                 state.files.push(fileData);
@@ -1746,22 +1745,42 @@
                                     updateButtonText();
                                 }
                             };
-                            img.src = dataURL;
-                        } else if (file.type === 'application/pdf') {
-                            state.files.push(fileData);
-                            processed++;
-                            if (processed === total) {
-                                getPdfPageCount(fileData).then(() => {
+                            img.src = fileData.dataURL;
+                        };
+                        reader.readAsDataURL(file);
+                    } else if (file.type === 'application/pdf') {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            fileData.arrayBuffer = e.target.result;
+                            // Create a blob URL for preview (optional)
+                            try {
+                                const blob = new Blob([fileData.arrayBuffer], { type: 'application/pdf' });
+                                fileData.dataURL = URL.createObjectURL(blob);
+                            } catch (e) {}
+                            // Get page count
+                            getPdfPageCount(fileData).then(() => {
+                                state.files.push(fileData);
+                                processed++;
+                                if (processed === total) {
                                     state.convertedData = null;
                                     updateFileList();
                                     updateButtonText();
-                                }).catch(() => {
+                                }
+                            }).catch(() => {
+                                state.files.push(fileData);
+                                processed++;
+                                if (processed === total) {
                                     state.convertedData = null;
                                     updateFileList();
                                     updateButtonText();
-                                });
-                            }
-                        } else {
+                                }
+                            });
+                        };
+                        reader.readAsArrayBuffer(file);
+                    } else {
+                        const reader = new FileReader();
+                        reader.onload = function(e) {
+                            fileData.dataURL = e.target.result;
                             state.files.push(fileData);
                             processed++;
                             if (processed === total) {
@@ -1769,9 +1788,9 @@
                                 updateFileList();
                                 updateButtonText();
                             }
-                        }
-                    };
-                    reader.readAsDataURL(file);
+                        };
+                        reader.readAsDataURL(file);
+                    }
                 });
 
                 if (validFiles.length === 0) return;
@@ -1782,7 +1801,9 @@
                 try {
                     const pdfjsLib = window.pdfjsLib;
                     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-                    const pdf = await pdfjsLib.getDocument({ data: fileData.dataURL }).promise;
+                    // IMPORTANT: convert ArrayBuffer to Uint8Array to avoid "Invalid PDF structure"
+                    const data = new Uint8Array(fileData.arrayBuffer);
+                    const pdf = await pdfjsLib.getDocument({ data }).promise;
                     fileData.pages = pdf.numPages;
                     return pdf.numPages;
                 } catch (e) {
@@ -1828,7 +1849,7 @@
                 }
             }
 
-            // ---- Image → PDF (FIXED) ----
+            // ---- Image → PDF (unchanged, works) ----
             async function convertImagesToPdf() {
                 const imageFiles = state.files.filter(f => f.type && f.type.startsWith('image/') && f.dataURL);
                 if (imageFiles.length === 0) {
@@ -1855,14 +1876,12 @@
                     const f = imageFiles[i];
                     const img = new Image();
 
-                    // FIX: load image with proper event ordering
                     await new Promise((resolve, reject) => {
                         img.onload = resolve;
                         img.onerror = () => reject(new Error(`Failed to load image: ${f.name}`));
                         img.src = f.dataURL;
                     });
 
-                    // Validate image dimensions
                     if (!img.width || !img.height || img.width === 0 || img.height === 0) {
                         throw new Error(`Invalid image dimensions (${img.width}×${img.height}) for: ${f.name}`);
                     }
@@ -1884,18 +1903,7 @@
 
                     if (i > 0) pdf.addPage();
 
-                    // Add the image to the PDF — use the img element or data URL
-                    try {
-                        // Use the HTMLImageElement directly — more reliable
-                        pdf.addImage(img, imgFormat, x, y, imgWidth, imgHeight);
-                    } catch (addErr) {
-                        // Fallback: try using the data URL
-                        try {
-                            pdf.addImage(f.dataURL, imgFormat, x, y, imgWidth, imgHeight);
-                        } catch (fallbackErr) {
-                            throw new Error(`Failed to add image "${f.name}" to PDF: ${fallbackErr.message}`);
-                        }
-                    }
+                    pdf.addImage(img, imgFormat, x, y, imgWidth, imgHeight);
 
                     state.progress = ((i + 1) / total) * 100;
                     progressFill.style.width = state.progress + '%';
@@ -1908,17 +1916,22 @@
                 progressText.textContent = '✅ Conversion complete!';
             }
 
-            // ---- PDF → Images ----
+            // ---- PDF → Images — FIXED: use Uint8Array ----
             async function convertPdfToImages() {
                 const pdfFile = state.files.find(f => f.type === 'application/pdf');
                 if (!pdfFile) {
                     throw new Error('No PDF file found.');
                 }
+                if (!pdfFile.arrayBuffer) {
+                    throw new Error('PDF data not loaded (missing ArrayBuffer).');
+                }
 
                 const pdfjsLib = window.pdfjsLib;
                 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-                const loadingTask = pdfjsLib.getDocument({ data: pdfFile.dataURL });
+                // CRITICAL FIX: convert ArrayBuffer to Uint8Array before passing to pdf.js
+                const data = new Uint8Array(pdfFile.arrayBuffer);
+                const loadingTask = pdfjsLib.getDocument({ data });
                 const pdf = await loadingTask.promise;
                 const numPages = pdf.numPages;
 
