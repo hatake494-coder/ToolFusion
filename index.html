@@ -633,6 +633,29 @@
             color: var(--text-muted);
         }
 
+        /* ===== No Results ===== */
+        .no-search-results {
+            display: none;
+            text-align: center;
+            padding: 48px 24px;
+            grid-column: 1 / -1;
+            color: var(--text-muted);
+        }
+        .no-search-results .icon-big {
+            font-size: 3rem;
+            display: block;
+            margin-bottom: 12px;
+        }
+        .no-search-results h3 {
+            font-weight: 600;
+            font-size: 1.2rem;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .no-search-results p {
+            font-size: 0.95rem;
+        }
+
         /* ===== Categories ===== */
         .categories {
             background: var(--bg-secondary);
@@ -1199,7 +1222,7 @@
                     <span class="search-icon" aria-hidden="true">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
                     </span>
-                    <input type="search" placeholder="Search tools..." aria-label="Search tools" />
+                    <input type="search" id="searchInput" placeholder="Search tools..." aria-label="Search tools" autocomplete="off" />
                 </div>
                 <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle theme">
                     <span id="themeIcon">🌙</span>
@@ -1277,6 +1300,11 @@
                 </div>
                 <div class="tools-grid" id="toolsGrid">
                     <!-- populated by JS -->
+                    <div class="no-search-results" id="noSearchResults">
+                        <span class="icon-big">🔍</span>
+                        <h3>No tools found</h3>
+                        <p>Try adjusting your search terms.</p>
+                    </div>
                 </div>
             </div>
         </section>
@@ -1409,19 +1437,16 @@
         // ================================================================
 
         const toolsData = [
-           
-  
-
-            { icon: '🗜️', name: 'Image Compressor', desc: 'Reduce image size without quality loss.', link: 'image-compressor.html' },
-            { icon: '📐', name: 'Image Resizer', desc: 'Resize images for any platform.', link: 'image-resizer.html' },
-            { icon: '📑', name: 'PDF Merge', desc: 'Combine multiple PDFs in seconds.', link: 'pdf-merge.html' },
-            { icon: '✂️', name: 'PDF Split', desc: 'Split PDF pages easily.', link: 'pdf-split.html' },
-            { icon: '📄', name: 'JPG to PDF', desc: 'Convert JPG images to PDF format.', link: 'jpg-to-pdf.html' },
-            { icon: '📱', name: 'QR Code Generator', desc: 'Create custom QR codes instantly.', link: 'qr-code-generator.html' },
-            { icon: '🔐', name: 'Password Generator', desc: 'Generate strong, secure passwords.', link: 'password-generator.html' },
-            { icon: '📝', name: 'Word Counter', desc: 'Count words, characters, and lines.', link: 'word-counter.html' },
-            { icon: '🎂', name: 'Age Calculator', desc: 'Calculate your age in years, months, days.', link: 'age-calculator.html' },
-            { icon: '🔄', name: 'JPG to PNG', desc: 'Convert JPG images to PNG format.', link: 'jpg-to-png.html' }
+            { icon: '🗜️', name: 'Image Compressor', desc: 'Reduce image size without quality loss.', link: 'image-compressor.html', category: 'Image Tools' },
+            { icon: '📐', name: 'Image Resizer', desc: 'Resize images for any platform.', link: 'image-resizer.html', category: 'Image Tools' },
+            { icon: '📑', name: 'PDF Merge', desc: 'Combine multiple PDFs in seconds.', link: 'pdf-merge.html', category: 'PDF Tools' },
+            { icon: '✂️', name: 'PDF Split', desc: 'Split PDF pages easily.', link: 'pdf-split.html', category: 'PDF Tools' },
+            { icon: '📄', name: 'JPG to PDF', desc: 'Convert JPG images to PDF format.', link: 'jpg-to-pdf.html', category: 'PDF Tools' },
+            { icon: '📱', name: 'QR Code Generator', desc: 'Create custom QR codes instantly.', link: 'qr-code-generator.html', category: 'Utility Tools' },
+            { icon: '🔐', name: 'Password Generator', desc: 'Generate strong, secure passwords.', link: 'password-generator.html', category: 'Utility Tools' },
+            { icon: '📝', name: 'Word Counter', desc: 'Count words, characters, and lines.', link: 'word-counter.html', category: 'Text Tools' },
+            { icon: '🎂', name: 'Age Calculator', desc: 'Calculate your age in years, months, days.', link: 'age-calculator.html', category: 'Calculator Tools' },
+            { icon: '🔄', name: 'JPG to PNG', desc: 'Convert JPG images to PNG format.', link: 'jpg-to-png.html', category: 'Image Tools' }
         ];
 
         const blogPosts = [{
@@ -1464,13 +1489,38 @@
 
         function renderTools() {
             const grid = document.getElementById('toolsGrid');
-            grid.innerHTML = toolsData.map((t, i) =>
-                `<a href="${t.link}" class="tool-card lazy" data-delay="${i * 60}">
-                      <span class="icon">${t.icon}</span>
-                      <h4>${t.name}</h4>
-                      <p>${t.desc}</p>
-                    </a>`
-            ).join('');
+            // Keep the no-results element as the last child
+            const noResults = grid.querySelector('#noSearchResults');
+            grid.innerHTML = '';
+            toolsData.forEach((t, i) => {
+                const card = document.createElement('a');
+                card.href = t.link;
+                card.className = 'tool-card lazy';
+                card.dataset.delay = String(i * 60);
+                card.dataset.toolName = t.name.toLowerCase();
+                card.dataset.toolCategory = t.category.toLowerCase();
+                card.dataset.toolIndex = String(i);
+                card.innerHTML = `
+                    <span class="icon">${t.icon}</span>
+                    <h4>${t.name}</h4>
+                    <p>${t.desc}</p>
+                `;
+                grid.appendChild(card);
+            });
+            // Re-append the no-results element
+            if (noResults) {
+                grid.appendChild(noResults);
+            } else {
+                const nr = document.createElement('div');
+                nr.id = 'noSearchResults';
+                nr.className = 'no-search-results';
+                nr.innerHTML = `
+                    <span class="icon-big">🔍</span>
+                    <h3>No tools found</h3>
+                    <p>Try adjusting your search terms.</p>
+                `;
+                grid.appendChild(nr);
+            }
         }
 
         function renderBlog() {
@@ -1507,6 +1557,98 @@
                     if (!isActive) item.classList.add('active');
                 });
             });
+        }
+
+        // ================================================================
+        // SEARCH FUNCTIONALITY (UPGRADED)
+        // ================================================================
+
+        function initSearch() {
+            const searchInput = document.getElementById('searchInput');
+            const toolsGrid = document.getElementById('toolsGrid');
+            const noResults = document.getElementById('noSearchResults');
+
+            if (!searchInput || !toolsGrid) return;
+
+            let searchTimeout = null;
+
+            function performSearch(query) {
+                const q = query.toLowerCase().trim();
+                const cards = toolsGrid.querySelectorAll('.tool-card:not(#noSearchResults)');
+                let foundCount = 0;
+
+                cards.forEach(card => {
+                    const name = card.dataset.toolName || '';
+                    const category = card.dataset.toolCategory || '';
+                    const match = q === '' || name.includes(q) || category.includes(q);
+
+                    if (match) {
+                        card.style.display = '';
+                        foundCount++;
+                    } else {
+                        card.style.display = 'none';
+                    }
+                });
+
+                // Show/hide no results message
+                if (noResults) {
+                    if (q !== '' && foundCount === 0) {
+                        noResults.style.display = 'block';
+                    } else {
+                        noResults.style.display = 'none';
+                    }
+                }
+
+                // Return first visible card for Enter key handling
+                const firstVisible = cards.find(card => card.style.display !== 'none');
+                return firstVisible;
+            }
+
+            function handleSearchInput() {
+                const query = searchInput.value;
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    performSearch(query);
+                }, 150);
+            }
+
+            // Input event with debounce
+            searchInput.addEventListener('input', handleSearchInput);
+
+            // Enter key: open first matching tool
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const query = this.value;
+                    const cards = toolsGrid.querySelectorAll('.tool-card:not(#noSearchResults)');
+                    // Find first visible card
+                    let firstMatch = null;
+                    for (const card of cards) {
+                        if (card.style.display !== 'none') {
+                            firstMatch = card;
+                            break;
+                        }
+                    }
+                    if (firstMatch) {
+                        e.preventDefault();
+                        // Navigate to the tool link
+                        window.location.href = firstMatch.href;
+                    }
+                }
+            });
+
+            // Also handle the search icon click to focus the input
+            const searchIcon = document.querySelector('.nav-search .search-icon');
+            if (searchIcon) {
+                searchIcon.addEventListener('click', function() {
+                    searchInput.focus();
+                });
+            }
+
+            // Expose the search function for external use
+            window.__toolnovaSearch = performSearch;
+
+            // Initial state: show all tools
+            performSearch('');
         }
 
         // ================================================================
@@ -1600,15 +1742,12 @@
 
         function initNavbarScroll() {
             const navbar = document.getElementById('navbar');
-            let lastScroll = 0;
             window.addEventListener('scroll', () => {
-                const currentScroll = window.pageYOffset;
-                if (currentScroll > 20) {
+                if (window.pageYOffset > 20) {
                     navbar.classList.add('scrolled');
                 } else {
                     navbar.classList.remove('scrolled');
                 }
-                lastScroll = currentScroll;
             });
         }
 
@@ -1655,6 +1794,7 @@
             initNewsletter();
             initNavbarScroll();
             initActiveNav();
+            initSearch(); // <-- upgraded search
 
             // smooth anchor scroll
             document.querySelectorAll('a[href^="#"]').forEach(anchor => {
@@ -1670,6 +1810,22 @@
                     }
                 });
             });
+
+            // If there's a search param in URL, populate search
+            const urlParams = new URLSearchParams(window.location.search);
+            const searchQuery = urlParams.get('search');
+            if (searchQuery) {
+                const searchInput = document.getElementById('searchInput');
+                if (searchInput) {
+                    searchInput.value = searchQuery;
+                    // Trigger search after tools are rendered
+                    setTimeout(() => {
+                        if (window.__toolnovaSearch) {
+                            window.__toolnovaSearch(searchQuery);
+                        }
+                    }, 100);
+                }
+            }
         });
     </script>
 
