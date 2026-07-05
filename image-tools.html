@@ -50,7 +50,7 @@
         }
     </script>
 
-    <!-- Import Map for @imgly/background-removal -->
+    <!-- Import Map for @imgly/background-removal (fixed URL) -->
     <script type="importmap">
         {
             "imports": {
@@ -1282,7 +1282,7 @@
                 </div>
 
                 <!-- ===== TABS ===== -->
-                <div class="tabs" role="tablist">
+                <div class="tabs" id="toolTabs" role="tablist">
                     <button class="tab-btn active" data-tab="background" role="tab" aria-selected="true">
                         <span class="tab-icon">🖼️</span> Remove Background
                     </button>
@@ -1304,13 +1304,13 @@
 
                     <div class="error-msg" id="errorMsgBg"></div>
 
-                    <!-- Instructions (updated for AI) -->
+                    <!-- Instructions -->
                     <div class="instructions">
                         <p><strong>AI Background Remover:</strong> Our AI automatically detects the main subject and removes the background with fine edge detail — no manual selection needed.</p>
                         <p style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">💡 Works best on images with clear subjects (people, products, animals). Hair and fine edges are preserved.</p>
                     </div>
 
-                    <!-- Controls (no color picker or tolerance) -->
+                    <!-- Controls -->
                     <div class="controls-row" id="controlsBg">
                         <div class="btn-group" style="margin-left:0; width:100%; justify-content:center;">
                             <button class="btn btn-primary" id="removeBgBtn" disabled>✨ Remove Background</button>
@@ -1350,7 +1350,7 @@
                     </div>
                 </div>
 
-                <!-- ===== TAB: Logo / Watermark Removal (IMPROVED) ===== -->
+                <!-- ===== TAB: Logo / Watermark Removal ===== -->
                 <div class="tab-panel" id="panel-watermark" role="tabpanel">
                     <div class="upload-zone" id="uploadZoneWm">
                         <span class="icon">🚫</span>
@@ -1366,7 +1366,7 @@
                     <!-- Instructions -->
                     <div class="instructions">
                         <p><strong>How it works:</strong> Select a mode below, then mark the logo/watermark area on the image. The AI will reconstruct the area using content-aware inpainting.</p>
-                        <p style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">💡 <strong>Rectangle</strong> – drag a box around the logo &bull; <strong>Brush</strong> – paint over the logo &bull; <strong>Auto</strong> – let AI detect likely logos (improved accuracy)</p>
+                        <p style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">💡 <strong>Rectangle</strong> – drag a box around the logo &bull; <strong>Brush</strong> – paint over the logo &bull; <strong>Auto</strong> – let AI detect likely logos</p>
                     </div>
 
                     <!-- Controls -->
@@ -1531,9 +1531,76 @@
 
     <script type="module">
         // ================================================================
-        // IMPORT AI LIBRARY (for Background Remover)
+        // DYNAMIC IMPORT FOR AI BACKGROUND REMOVAL (with fallback)
         // ================================================================
-        import removeBackground from '@imgly/background-removal';
+        let removeBackground = null;
+        let bgLibraryLoaded = false;
+        let bgLibraryError = null;
+
+        async function loadBackgroundRemovalLibrary() {
+            try {
+                // First attempt: use the import map
+                const module = await import('@imgly/background-removal');
+                // The library exports a default function or named exports
+                if (typeof module === 'function') {
+                    removeBackground = module;
+                } else if (module.default && typeof module.default === 'function') {
+                    removeBackground = module.default;
+                } else if (module.removeBackground && typeof module.removeBackground === 'function') {
+                    removeBackground = module.removeBackground;
+                } else {
+                    // Try to find any function in the module
+                    const keys = Object.keys(module);
+                    for (const key of keys) {
+                        if (typeof module[key] === 'function') {
+                            removeBackground = module[key];
+                            break;
+                        }
+                    }
+                }
+                if (!removeBackground) {
+                    throw new Error('Could not find removeBackground function in module');
+                }
+                bgLibraryLoaded = true;
+                console.log('✅ Background removal library loaded successfully');
+                return true;
+            } catch (err) {
+                console.warn('⚠️ Failed to load background removal library via import map:', err);
+                bgLibraryError = err;
+
+                // Try fallback: load from a different CDN using dynamic import with direct URL
+                try {
+                    const fallbackUrl =
+                        'https://unpkg.com/@imgly/background-removal@1.4.0/dist/background-removal.esm.js';
+                    const module = await import(fallbackUrl);
+                    if (typeof module === 'function') {
+                        removeBackground = module;
+                    } else if (module.default && typeof module.default === 'function') {
+                        removeBackground = module.default;
+                    } else if (module.removeBackground && typeof module.removeBackground === 'function') {
+                        removeBackground = module.removeBackground;
+                    } else {
+                        const keys = Object.keys(module);
+                        for (const key of keys) {
+                            if (typeof module[key] === 'function') {
+                                removeBackground = module[key];
+                                break;
+                            }
+                        }
+                    }
+                    if (removeBackground) {
+                        bgLibraryLoaded = true;
+                        console.log('✅ Background removal library loaded via fallback');
+                        return true;
+                    }
+                    throw new Error('Fallback module did not contain a removeBackground function');
+                } catch (fallbackErr) {
+                    console.error('❌ Fallback also failed:', fallbackErr);
+                    bgLibraryError = fallbackErr;
+                    return false;
+                }
+            }
+        }
 
         // ================================================================
         // SHARED STATE
@@ -1544,6 +1611,7 @@
                 originalData: null,
                 resultData: null,
                 processed: false,
+                isProcessing: false,
             },
             wm: {
                 file: null,
@@ -1565,18 +1633,20 @@
                 originalHeight: 0,
                 processedWidth: 0,
                 processedHeight: 0,
+                isProcessing: false,
             }
         };
 
         let activeTab = 'background';
 
         // ================================================================
-        // DOM REFS (Background)
+        // DOM REFS
         // ================================================================
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
         const progressFill = document.getElementById('progressFill');
 
+        // Background tab
         const uploadZoneBg = document.getElementById('uploadZoneBg');
         const fileInputBg = document.getElementById('fileInputBg');
         const errorMsgBg = document.getElementById('errorMsgBg');
@@ -1592,7 +1662,7 @@
         const downloadBgBtn = document.getElementById('downloadBgBtn');
         const resetBgBtn = document.getElementById('resetBgBtn');
 
-        // DOM REFS (Watermark)
+        // Watermark tab
         const uploadZoneWm = document.getElementById('uploadZoneWm');
         const fileInputWm = document.getElementById('fileInputWm');
         const errorMsgWm = document.getElementById('errorMsgWm');
@@ -1664,20 +1734,50 @@
         }
 
         // ================================================================
-        // TAB SWITCHING
+        // TAB SWITCHING (fixed: single handler, clean state)
         // ================================================================
-        document.querySelectorAll('.tab-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                document.querySelectorAll('.tab-btn').forEach(b => {
-                    b.classList.remove('active');
-                    b.setAttribute('aria-selected', 'false');
-                });
-                btn.classList.add('active');
-                btn.setAttribute('aria-selected', 'true');
+        const tabButtons = document.querySelectorAll('#toolTabs .tab-btn');
+        const tabPanels = {
+            background: document.getElementById('panel-background'),
+            watermark: document.getElementById('panel-watermark')
+        };
 
-                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-                document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-                activeTab = btn.dataset.tab;
+        function switchTab(tabId) {
+            if (tabId === activeTab) return;
+
+            // Update buttons
+            tabButtons.forEach(btn => {
+                const isActive = btn.dataset.tab === tabId;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+            });
+
+            // Update panels
+            Object.keys(tabPanels).forEach(key => {
+                tabPanels[key].classList.toggle('active', key === tabId);
+            });
+
+            activeTab = tabId;
+
+            // Re-initialize the watermark canvas if switching to watermark tab
+            // This ensures the canvas is properly set up
+            if (tabId === 'watermark' && state.wm.originalData && !wmCanvas) {
+                // The canvas should already be in the DOM, but we might need to re-setup
+                // events if they were lost. We'll let the existing setup handle it.
+                // The handleWmFile function already sets up the canvas and events.
+                // If the image was already loaded, we need to re-attach events.
+                const canvas = wmOriginalWrap.querySelector('canvas');
+                if (canvas) {
+                    setupWmCanvasEvents(canvas);
+                }
+            }
+        }
+
+        // Attach tab switching with cleanup to prevent duplicate listeners
+        tabButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const tabId = btn.dataset.tab;
+                switchTab(tabId);
             });
         });
 
@@ -1733,7 +1833,7 @@
         }
 
         // ================================================================
-        // BACKGROUND TAB LOGIC (AI - UNCHANGED)
+        // BACKGROUND TAB LOGIC (AI)
         // ================================================================
 
         function handleBgFile(file) {
@@ -1801,10 +1901,29 @@
 
         async function performBgRemoval() {
             if (!state.bg.originalData) return;
+            if (state.bg.isProcessing) return;
+            state.bg.isProcessing = true;
+            removeBgBtn.disabled = true;
+
+            // Check if library is loaded
+            if (!bgLibraryLoaded) {
+                showLoading(true, 'Loading AI library...', 5);
+                const loaded = await loadBackgroundRemovalLibrary();
+                if (!loaded) {
+                    showLoading(false);
+                    showError(errorMsgBg, 'AI library failed to load. Please check your internet connection and refresh.');
+                    removeBgBtn.disabled = false;
+                    state.bg.isProcessing = false;
+                    return;
+                }
+            }
+
             showLoading(true, 'AI is analyzing the subject...', 5);
             try {
                 const response = await fetch(state.bg.originalData.url);
                 const imageBlob = await response.blob();
+
+                // Use the removeBackground function
                 const resultBlob = await removeBackground(imageBlob, {
                     progress: (progress) => {
                         const pct = Math.round(progress * 90);
@@ -1812,8 +1931,10 @@
                     },
                     output: { format: 'png' }
                 });
+
                 updateProgress('Finalizing result...', 95);
                 const resultUrl = URL.createObjectURL(resultBlob);
+
                 if (state.bg.resultData?.url) revokeUrl(state.bg.resultData.url);
                 state.bg.resultData = {
                     url: resultUrl,
@@ -1821,17 +1942,21 @@
                     format: 'image/png'
                 };
                 state.bg.processed = true;
+
                 bgResultWrap.innerHTML =
                     `<img src="${resultUrl}" alt="Result" style="max-width:100%;max-height:450px;object-fit:contain;" />`;
                 bgResultSize.textContent = formatFileSize(resultBlob.size);
                 bgResultFormat.textContent = 'PNG';
                 bgResultStatus.textContent = '✅ Background removed with AI';
+
                 downloadBgBtn.disabled = false;
                 showLoading(false, 'Done!', 100);
             } catch (err) {
-                console.error(err);
+                console.error('Background removal error:', err);
                 showLoading(false);
-                showError(errorMsgBg, 'AI processing failed: ' + err.message);
+                showError(errorMsgBg, 'AI processing failed: ' + (err.message || 'Unknown error'));
+            } finally {
+                state.bg.isProcessing = false;
                 removeBgBtn.disabled = false;
             }
         }
@@ -1854,6 +1979,7 @@
             state.bg.originalData = null;
             state.bg.resultData = null;
             state.bg.processed = false;
+            state.bg.isProcessing = false;
             bgOriginalWrap.innerHTML = `<div class="placeholder">No image uploaded yet</div>`;
             bgOriginalSize.textContent = '—';
             bgOriginalFormat.textContent = '—';
@@ -1869,46 +1995,34 @@
             showLoading(false);
         }
 
-        fileInputBg.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) handleBgFile(e.target.files[0]);
-        });
-        uploadZoneBg.addEventListener('dragover', (e) => { e.preventDefault();
-            uploadZoneBg.classList.add('dragover'); });
-        uploadZoneBg.addEventListener('dragleave', (e) => { e.preventDefault();
-            uploadZoneBg.classList.remove('dragover'); });
-        uploadZoneBg.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadZoneBg.classList.remove('dragover');
-            if (e.dataTransfer.files.length > 0) handleBgFile(e.dataTransfer.files[0]);
-        });
-        removeBgBtn.addEventListener('click', performBgRemoval);
-        downloadBgBtn.addEventListener('click', downloadBgResult);
-        resetBgBtn.addEventListener('click', resetBg);
-
         // ================================================================
-        // ================================================================
-        // IMPROVED LOGO REMOVER (Enhanced Detection + Inpainting)
-        // ================================================================
+        // LOGO REMOVER (Complete, independent)
         // ================================================================
 
-        // ----- Helper for skin color detection -----
+        let wmCanvas = null;
+        let wmCtx = null;
+        let wmImageData = null;
+        let wmOriginalImageData = null;
+        let wmMask = null;
+        let wmRect = null;
+        let wmBrushPoints = [];
+        let wmProcessingResized = false;
+        let wmIsInitialized = false;
+
+        // ----- Detection engine -----
         function isSkinColor(r, g, b) {
-            // Convert to YCbCr for skin detection
             const y = 0.299 * r + 0.587 * g + 0.114 * b;
             const cb = 128 + (-0.168736 * r - 0.331264 * g + 0.5 * b);
             const cr = 128 + (0.5 * r - 0.418688 * g - 0.081312 * b);
-            // Common skin range in YCbCr
             return (y > 80 && y < 230 && cb > 77 && cb < 127 && cr > 133 && cr < 173);
         }
 
-        // ----- Improved detection engine -----
         function detectLogosEnhanced(imageData) {
             const data = imageData.data;
             const width = imageData.width;
             const height = imageData.height;
             const totalPixels = width * height;
 
-            // Convert to grayscale and also collect RGB for skin & color uniformity
             const gray = new Float32Array(totalPixels);
             const rgb = new Uint8Array(totalPixels * 3);
             for (let i = 0; i < totalPixels; i++) {
@@ -1922,7 +2036,6 @@
                 gray[i] = 0.299 * r + 0.587 * g + 0.114 * b;
             }
 
-            // 1. Edge strength (Sobel)
             const edgeStrength = new Float32Array(totalPixels);
             for (let y = 1; y < height - 1; y++) {
                 for (let x = 1; x < width - 1; x++) {
@@ -1935,7 +2048,6 @@
                 }
             }
 
-            // 2. Local variance (texture)
             const variance = new Float32Array(totalPixels);
             const halfW = 3;
             for (let y = halfW; y < height - halfW; y++) {
@@ -1958,7 +2070,6 @@
                 }
             }
 
-            // 3. Color uniformity: low variance in HSV or RGB (logos often have uniform colors)
             const colorUniformity = new Float32Array(totalPixels);
             for (let y = halfW; y < height - halfW; y++) {
                 for (let x = halfW; x < width - halfW; x++) {
@@ -1993,12 +2104,10 @@
                         }
                     }
                     const totalVar = (varR + varG + varB) / count;
-                    colorUniformity[idx] = 1 / (1 + totalVar / 500); // high = uniform
+                    colorUniformity[idx] = 1 / (1 + totalVar / 500);
                 }
             }
 
-            // 4. High-frequency content (text/logo often has sharp transitions)
-            // Use Laplacian or just edge density
             const edgeDensity = new Float32Array(totalPixels);
             const densityWin = 5;
             const halfDW = Math.floor(densityWin / 2);
@@ -2018,31 +2127,24 @@
                 }
             }
 
-            // Combine scores: logo = high edge density + high variance + high color uniformity + not skin
             const logoScore = new Float32Array(totalPixels);
             for (let i = 0; i < totalPixels; i++) {
                 const ed = edgeDensity[i] || 0;
                 const varScore = Math.min(1, variance[i] / 200);
                 const uniScore = colorUniformity[i] || 0;
-                // Skin penalty
                 const i3 = i * 3;
                 const isSkin = isSkinColor(rgb[i3], rgb[i3 + 1], rgb[i3 + 2]) ? 0.3 : 1.0;
-                // Combine: give more weight to edge density and uniformity
                 let score = (ed * 0.5 + varScore * 0.2 + uniScore * 0.3) * isSkin;
-                // Boost if high edge density and high uniformity (typical logo)
                 if (ed > 0.3 && uniScore > 0.6) score *= 1.5;
                 logoScore[i] = Math.min(1, score);
             }
 
-            // Threshold and create mask
             const mask = new Uint8Array(totalPixels);
             const threshold = 0.45;
             for (let i = 0; i < totalPixels; i++) {
                 if (logoScore[i] > threshold) mask[i] = 1;
             }
 
-            // ---- Post-processing: remove small regions, border regions, and large areas ----
-            // Connected component analysis
             const visited = new Uint8Array(totalPixels);
             const regions = [];
             for (let i = 0; i < totalPixels; i++) {
@@ -2055,7 +2157,6 @@
                         region.push(idx);
                         const x = idx % width;
                         const y = Math.floor(idx / width);
-                        // 8-neighbor
                         for (let dy = -1; dy <= 1; dy++) {
                             for (let dx = -1; dx <= 1; dx++) {
                                 if (dx === 0 && dy === 0) continue;
@@ -2075,11 +2176,9 @@
                 }
             }
 
-            // Filter regions
             const finalMask = new Uint8Array(totalPixels);
             const totalArea = width * height;
             for (const region of regions) {
-                // Compute bounding box and area
                 let minX = width,
                     maxX = 0,
                     minY = height,
@@ -2095,20 +2194,15 @@
                 const rw = maxX - minX + 1;
                 const rh = maxY - minY + 1;
                 const area = region.length;
-                const bboxArea = rw * rh;
-                // Reject if too small, too large (>40% of image), or touches border (often background)
                 if (area < 20 || area > totalArea * 0.4) continue;
                 if (minX < 3 || maxX >= width - 3 || minY < 3 || maxY >= height - 3) continue;
-                // Reject if aspect ratio too extreme (not logo-like)
                 const aspect = Math.max(rw, rh) / Math.min(rw, rh);
                 if (aspect > 6) continue;
-                // Accept
                 for (const idx of region) {
                     finalMask[idx] = 1;
                 }
             }
 
-            // Optional: dilate slightly to cover edges
             const dilated = new Uint8Array(finalMask);
             const dilateRadius = 2;
             for (let i = 0; i < totalPixels; i++) {
@@ -2130,7 +2224,7 @@
             return dilated;
         }
 
-        // ----- Improved Inpainting (higher quality, faster) -----
+        // ----- Inpainting -----
         function inpaintImageOptimized(imageData, mask, patchSize, onProgress) {
             const data = imageData.data;
             const width = imageData.width;
@@ -2147,8 +2241,6 @@
             if (maskedPixels.length === 0) return result;
 
             const workingMask = new Uint8Array(mask);
-
-            // Multi-scale: coarse to fine
             const patchSizes = [
                 Math.max(10, Math.round(patchSize * 1.4)),
                 Math.max(6, Math.round(patchSize * 0.9)),
@@ -2179,7 +2271,6 @@
                     let bestScore = Infinity;
                     let bestSx = px,
                         bestSy = py;
-                    // Use more samples for first pass, fewer for refinement
                     const numSamples = Math.min(80, (pass === 0 ? 80 : 40) + searchRadius);
 
                     for (let s = 0; s < numSamples; s++) {
@@ -2191,7 +2282,6 @@
 
                         if (pass === 0 && workingMask[sidx] > 0) continue;
 
-                        // Compute patch similarity with gradient weighting
                         let score = 0;
                         let sampleCount = 0;
                         const step = Math.max(1, Math.floor(currentPatchSize / 5));
@@ -2214,7 +2304,6 @@
                                 const dr = targetData[ti] - sourceData[si];
                                 const dg = targetData[ti + 1] - sourceData[si + 1];
                                 const db = targetData[ti + 2] - sourceData[si + 2];
-                                // Weight by distance from center (center more important)
                                 const distWeight = 1 - Math.sqrt(dx2 * dx2 + dy2 * dy2) / (halfPatch * 1.5);
                                 const w = Math.max(0.3, distWeight);
                                 score += w * (dr * dr + dg * dg + db * db);
@@ -2234,7 +2323,6 @@
                         }
                     }
 
-                    // Copy patch
                     const srcIdx = bestSy * width + bestSx;
                     const srcData = (workingMask[srcIdx] > 0 && pass === 0) ? original : result;
 
@@ -2255,14 +2343,12 @@
                 }
             }
 
-            // Final edge-preserving smoothing using weighted median filter on mask boundary
             const smoothed = new Uint8ClampedArray(result);
             const blurRadius = 2;
             for (let i = 0; i < maskedPixels.length; i++) {
                 const idx = maskedPixels[i];
                 const x = idx % width;
                 const y = Math.floor(idx / width);
-                // Only apply smoothing if near boundary (to preserve details)
                 let isBoundary = false;
                 for (let dy = -1; dy <= 1 && !isBoundary; dy++) {
                     for (let dx = -1; dx <= 1 && !isBoundary; dx++) {
@@ -2285,7 +2371,6 @@
                         const ny = clamp(y + dy, 0, height - 1);
                         const ni = ny * width + nx;
                         const ni4 = ni * 4;
-                        // Weight by spatial distance and color similarity
                         const dist = Math.sqrt(dx * dx + dy * dy);
                         const colorDist = Math.abs(result[ni4] - result[idx * 4]) +
                             Math.abs(result[ni4 + 1] - result[idx * 4 + 1]) +
@@ -2308,16 +2393,7 @@
             return smoothed;
         }
 
-        // ----- Logo Remover UI logic (unchanged except using improved functions) -----
-        let wmCanvas = null;
-        let wmCtx = null;
-        let wmImageData = null;
-        let wmOriginalImageData = null;
-        let wmMask = null;
-        let wmRect = null;
-        let wmBrushPoints = [];
-        let wmProcessingResized = false;
-
+        // ----- WM UI Functions -----
         function handleWmFile(file) {
             if (!file) return;
             const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -2343,6 +2419,7 @@
             wmRect = null;
             wmBrushPoints = [];
             wmMask = null;
+            wmIsInitialized = false;
             removeWmBtn.disabled = true;
             downloadWmBtn.disabled = true;
 
@@ -2450,6 +2527,7 @@
                 }
 
                 removeWmBtn.disabled = false;
+                wmIsInitialized = true;
                 showLoading(false, 'Image loaded', 100);
             };
             img.onerror = () => {
@@ -2461,6 +2539,7 @@
         }
 
         function setupWmCanvasEvents(canvas) {
+            // Remove old listeners by cloning
             const newCanvas = canvas.cloneNode(true);
             canvas.parentNode.replaceChild(newCanvas, canvas);
             wmCanvas = newCanvas;
@@ -2485,7 +2564,6 @@
             else if (mode === 'auto') setupAutoMode(newCanvas);
         }
 
-        // ----- Rectangle Mode (unchanged) -----
         function setupRectMode(canvas) {
             let isDown = false;
             let startX = 0,
@@ -2578,6 +2656,15 @@
                 }
             };
 
+            // Remove old listeners by replacing with new ones
+            canvas.removeEventListener('mousedown', startDraw);
+            canvas.removeEventListener('mousemove', moveDraw);
+            canvas.removeEventListener('mouseup', endDraw);
+            canvas.removeEventListener('mouseleave', endDraw);
+            canvas.removeEventListener('touchstart', startDraw);
+            canvas.removeEventListener('touchmove', moveDraw);
+            canvas.removeEventListener('touchend', endDraw);
+
             canvas.addEventListener('mousedown', startDraw);
             canvas.addEventListener('mousemove', moveDraw);
             canvas.addEventListener('mouseup', endDraw);
@@ -2588,7 +2675,6 @@
             updateHintWm('▭ Drag to draw a rectangle around the logo');
         }
 
-        // ----- Brush Mode (unchanged) -----
         function setupBrushMode(canvas) {
             let isPainting = false;
             const brushSize = parseInt(brushSizeSlider.value) || 16;
@@ -2652,6 +2738,14 @@
                 } else { wmResultStatus.textContent = '—'; }
             };
 
+            canvas.removeEventListener('mousedown', startPaint);
+            canvas.removeEventListener('mousemove', movePaint);
+            canvas.removeEventListener('mouseup', endPaint);
+            canvas.removeEventListener('mouseleave', endPaint);
+            canvas.removeEventListener('touchstart', startPaint);
+            canvas.removeEventListener('touchmove', movePaint);
+            canvas.removeEventListener('touchend', endPaint);
+
             canvas.addEventListener('mousedown', startPaint);
             canvas.addEventListener('mousemove', movePaint);
             canvas.addEventListener('mouseup', endPaint);
@@ -2664,7 +2758,6 @@
             brushSizeSlider.addEventListener('input', () => { brushSizeValue.textContent = brushSizeSlider.value; });
         }
 
-        // ----- Auto Mode (uses enhanced detection) -----
         function setupAutoMode(canvas) {
             updateHintWm('🤖 AI is analyzing the image...');
             if (state.wm.autoDetected && wmMask) {
@@ -2677,11 +2770,19 @@
             } else {
                 runAutoDetectionEnhanced(canvas);
             }
-            canvas.addEventListener('click', (e) => { if (state.wm.mode === 'auto') runAutoDetectionEnhanced(canvas); });
-            canvas.addEventListener('touchstart', (e) => {
+
+            canvas.removeEventListener('click', autoClickHandler);
+            canvas.removeEventListener('touchstart', autoTouchHandler);
+
+            function autoClickHandler(e) { if (state.wm.mode === 'auto') runAutoDetectionEnhanced(canvas); }
+
+            function autoTouchHandler(e) {
                 if (state.wm.mode === 'auto') { e.preventDefault();
                     runAutoDetectionEnhanced(canvas); }
-            }, { passive: false });
+            }
+
+            canvas.addEventListener('click', autoClickHandler);
+            canvas.addEventListener('touchstart', autoTouchHandler, { passive: false });
         }
 
         function runAutoDetectionEnhanced(canvas) {
@@ -2715,7 +2816,6 @@
             }, 100);
         }
 
-        // ----- Mask overlay (unchanged) -----
         function drawMaskOverlay() {
             if (!wmCanvas || !wmCtx || !wmMask) return;
             const canvas = wmCanvas,
@@ -2767,15 +2867,22 @@
             if (container) container.textContent = text;
         }
 
-        // ----- Perform removal (uses improved inpainting) -----
         function performWmRemoval() {
             if (!state.wm.originalData) { showError(errorMsgWm, 'Please upload an image first.'); return; }
             if (!wmMask || wmMask.length === 0) { showError(errorMsgWm,
                     'Please select the logo/watermark area first using Rectangle, Brush, or Auto mode.'); return; }
+            if (state.wm.isProcessing) return;
+            state.wm.isProcessing = true;
+            removeWmBtn.disabled = true;
 
             let maskedCount = 0;
             for (let i = 0; i < wmMask.length; i++) { if (wmMask[i] > 0) maskedCount++; }
-            if (maskedCount < 5) { showError(errorMsgWm, 'No logo/watermark area selected. Please mark the area first.'); return; }
+            if (maskedCount < 5) {
+                showError(errorMsgWm, 'No logo/watermark area selected. Please mark the area first.');
+                state.wm.isProcessing = false;
+                removeWmBtn.disabled = false;
+                return;
+            }
 
             showLoading(true, 'Inpainting logo area (AI)...', 5);
 
@@ -2855,9 +2962,15 @@
 
                 downloadWmBtn.disabled = false;
                 showLoading(false, 'Done!', 100);
+                state.wm.isProcessing = false;
+                removeWmBtn.disabled = false;
             };
-            img.onerror = () => { showLoading(false);
-                showError(errorMsgWm, 'Failed to process image.'); };
+            img.onerror = () => {
+                showLoading(false);
+                showError(errorMsgWm, 'Failed to process image.');
+                state.wm.isProcessing = false;
+                removeWmBtn.disabled = false;
+            };
             img.src = state.wm.originalData.url;
         }
 
@@ -2883,6 +2996,7 @@
             state.wm.brushPoints = [];
             state.wm.maskData = null;
             state.wm.autoDetected = false;
+            state.wm.isProcessing = false;
             wmRect = null;
             wmBrushPoints = [];
             wmMask = null;
@@ -2890,6 +3004,7 @@
             wmCtx = null;
             wmImageData = null;
             wmOriginalImageData = null;
+            wmIsInitialized = false;
             wmOriginalWrap.innerHTML = `<div class="placeholder">No image uploaded yet</div>`;
             wmOriginalSize.textContent = '—';
             wmOriginalFormat.textContent = '—';
@@ -2905,7 +3020,10 @@
             showLoading(false);
         }
 
-        // ----- WM Event bindings (unchanged) -----
+        // ================================================================
+        // WM EVENT BINDINGS
+        // ================================================================
+
         fileInputWm.addEventListener('change', (e) => {
             if (e.target.files.length > 0) handleWmFile(e.target.files[0]);
         });
@@ -2920,46 +3038,56 @@
             if (e.dataTransfer.files.length > 0) handleWmFile(e.dataTransfer.files[0]);
         });
 
-        modeSelector.querySelectorAll('.mode-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                modeSelector.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const mode = btn.dataset.mode;
-                state.wm.mode = mode;
-                brushSizeGroup.style.display = mode === 'brush' ? 'flex' : 'none';
+        // Mode selector - clean up listeners
+        let modeListenersAttached = false;
 
-                wmMask = new Uint8Array(wmCanvas ? wmCanvas.width * wmCanvas.height : 0);
-                state.wm.autoDetected = false;
-                state.wm.brushPoints = [];
-                state.wm.selection = null;
-                wmRect = null;
+        function attachModeListeners() {
+            if (modeListenersAttached) return;
+            modeListenersAttached = true;
 
-                if (wmCanvas) {
-                    const parent = wmCanvas.parentNode;
-                    const newCanvas = wmCanvas.cloneNode(true);
-                    parent.replaceChild(newCanvas, wmCanvas);
-                    wmCanvas = newCanvas;
-                    wmCtx = newCanvas.getContext('2d');
+            modeSelector.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    modeSelector.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    const mode = btn.dataset.mode;
+                    state.wm.mode = mode;
+                    brushSizeGroup.style.display = mode === 'brush' ? 'flex' : 'none';
 
-                    const img = new Image();
-                    img.onload = () => {
-                        wmCtx.drawImage(img, 0, 0);
-                        wmImageData = wmCtx.getImageData(0, 0, wmCanvas.width, wmCanvas.height);
-                        wmOriginalImageData = new Uint8ClampedArray(wmImageData.data);
-                        wmCanvas.dataset.originalData = img.src;
-                        if (mode === 'rectangle') { setupRectMode(wmCanvas);
-                            updateHintWm('▭ Drag to draw a rectangle around the logo'); } else if (mode ===
-                            'brush') { setupBrushMode(wmCanvas);
-                            updateHintWm('✏️ Paint over the logo to mark it'); } else if (mode === 'auto') {
-                            setupAutoMode(wmCanvas);
-                            setTimeout(() => runAutoDetectionEnhanced(wmCanvas), 200); }
-                    };
-                    img.src = wmCanvas.dataset.originalData || state.wm.originalData.url;
-                }
-                removeWmBtn.disabled = true;
-                wmResultStatus.textContent = '—';
+                    wmMask = new Uint8Array(wmCanvas ? wmCanvas.width * wmCanvas.height : 0);
+                    state.wm.autoDetected = false;
+                    state.wm.brushPoints = [];
+                    state.wm.selection = null;
+                    wmRect = null;
+
+                    if (wmCanvas) {
+                        const parent = wmCanvas.parentNode;
+                        const newCanvas = wmCanvas.cloneNode(true);
+                        parent.replaceChild(newCanvas, wmCanvas);
+                        wmCanvas = newCanvas;
+                        wmCtx = newCanvas.getContext('2d');
+
+                        const img = new Image();
+                        img.onload = () => {
+                            wmCtx.drawImage(img, 0, 0);
+                            wmImageData = wmCtx.getImageData(0, 0, wmCanvas.width, wmCanvas.height);
+                            wmOriginalImageData = new Uint8ClampedArray(wmImageData.data);
+                            wmCanvas.dataset.originalData = img.src;
+                            if (mode === 'rectangle') { setupRectMode(wmCanvas);
+                                updateHintWm('▭ Drag to draw a rectangle around the logo'); } else if (mode ===
+                                    'brush') { setupBrushMode(wmCanvas);
+                                updateHintWm('✏️ Paint over the logo to mark it'); } else if (mode === 'auto') {
+                                setupAutoMode(wmCanvas);
+                                setTimeout(() => runAutoDetectionEnhanced(wmCanvas), 200); }
+                        };
+                        img.src = wmCanvas.dataset.originalData || state.wm.originalData.url;
+                    }
+                    removeWmBtn.disabled = true;
+                    wmResultStatus.textContent = '—';
+                });
             });
-        });
+        }
+
+        attachModeListeners();
 
         patchSizeSlider.addEventListener('input', () => { patchSizeValue.textContent = patchSizeSlider.value; });
         brushSizeSlider.addEventListener('input', () => { brushSizeValue.textContent = brushSizeSlider.value; });
@@ -2990,7 +3118,7 @@
         // ================================================================
         // INIT
         // ================================================================
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             initTheme();
             initMenu();
             initNavbarScroll();
@@ -3003,6 +3131,18 @@
             patchSizeValue.textContent = patchSizeSlider.value;
             brushSizeValue.textContent = brushSizeSlider.value;
             brushSizeGroup.style.display = 'none';
+
+            // Preload the background removal library in the background
+            try {
+                await loadBackgroundRemovalLibrary();
+                if (bgLibraryLoaded) {
+                    console.log('✅ Background removal library preloaded');
+                } else {
+                    console.warn('⚠️ Background removal library preload failed, will retry on use');
+                }
+            } catch (e) {
+                console.warn('Background library preload error:', e);
+            }
 
             window.addEventListener('resize', () => {});
         });
