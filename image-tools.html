@@ -50,6 +50,15 @@
         }
     </script>
 
+    <!-- Import Map for @imgly/background-removal -->
+    <script type="importmap">
+        {
+            "imports": {
+                "@imgly/background-removal": "https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.4.0/dist/background-removal.esm.js"
+            }
+        }
+    </script>
+
     <style>
         /* ===== CSS Variables (matching ToolNova homepage) ===== */
         :root {
@@ -1282,7 +1291,7 @@
                     </button>
                 </div>
 
-                <!-- ===== TAB: Background Removal ===== -->
+                <!-- ===== TAB: Background Removal (AI) ===== -->
                 <div class="tab-panel active" id="panel-background" role="tabpanel">
                     <div class="upload-zone" id="uploadZoneBg">
                         <span class="icon">🖼️</span>
@@ -1295,27 +1304,16 @@
 
                     <div class="error-msg" id="errorMsgBg"></div>
 
-                    <!-- Instructions -->
+                    <!-- Instructions (updated for AI) -->
                     <div class="instructions">
-                        <p><strong>How it works:</strong> Click the <strong>🎯 Pick</strong> button, then click on the image background to sample the color. Adjust <strong>Tolerance</strong> to control how much of the background is removed. The AI will preserve the subject with clean edges.</p>
+                        <p><strong>AI Background Remover:</strong> Our AI automatically detects the main subject and removes the background with fine edge detail — no manual selection needed.</p>
+                        <p style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">💡 Works best on images with clear subjects (people, products, animals). Hair and fine edges are preserved.</p>
                     </div>
 
-                    <!-- Controls -->
+                    <!-- Controls (no color picker or tolerance) -->
                     <div class="controls-row" id="controlsBg">
-                        <div class="control-group">
-                            <label for="toleranceSlider">Tolerance</label>
-                            <input type="range" id="toleranceSlider" min="2" max="90" value="35" />
-                            <span class="range-value" id="toleranceValue">35</span>
-                        </div>
-                        <div class="control-group">
-                            <label>Sample Color</label>
-                            <div class="color-picker-wrapper">
-                                <input type="color" id="sampleColor" value="#ffffff" />
-                                <button class="btn btn-outline btn-sm" id="pickColorBtn">🎯 Pick</button>
-                            </div>
-                        </div>
-                        <div class="btn-group">
-                            <button class="btn btn-primary" id="removeBgBtn" disabled>Remove Background</button>
+                        <div class="btn-group" style="margin-left:0; width:100%; justify-content:center;">
+                            <button class="btn btn-primary" id="removeBgBtn" disabled>✨ Remove Background</button>
                             <button class="btn btn-success" id="downloadBgBtn" disabled>⬇ Download PNG</button>
                             <button class="btn btn-danger" id="resetBgBtn">↻ Reset</button>
                         </div>
@@ -1368,7 +1366,7 @@
                     <!-- Instructions -->
                     <div class="instructions">
                         <p><strong>How it works:</strong> Select a mode below, then mark the logo/watermark area on the image. The AI will reconstruct the area using content-aware inpainting.</p>
-                        <p style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">💡 <strong>Rectangle</strong> – drag a box around the logo &bull; <strong>Brush</strong> – paint over the logo &bull; <strong>Auto</strong> – let AI detect likely logos</p>
+                        <p style="font-size:0.85rem;color:var(--text-muted);margin-top:4px;">💡 <strong>Rectangle</strong> – drag a box around the logo &bull; <strong>Brush</strong> – paint over the logo &bull; <strong>Auto</strong> – let AI detect likely logos (improved accuracy)</p>
                     </div>
 
                     <!-- Controls -->
@@ -1531,7 +1529,12 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        // ================================================================
+        // IMPORT AI LIBRARY (for Background Remover)
+        // ================================================================
+        import removeBackground from '@imgly/background-removal';
+
         // ================================================================
         // SHARED STATE
         // ================================================================
@@ -1541,10 +1544,6 @@
                 originalData: null,
                 resultData: null,
                 processed: false,
-                sampleColor: '#ffffff',
-                tolerance: 35,
-                pickMode: false,
-                sampleRegion: null,
             },
             wm: {
                 file: null,
@@ -1570,26 +1569,9 @@
         };
 
         let activeTab = 'background';
-        let bgCanvasForPick = null;
-        let bgCtxForPick = null;
-
-        let wmCanvas = null;
-        let wmCtx = null;
-        let wmDisplayCanvas = null;
-        let wmDisplayCtx = null;
-        let wmImageData = null;
-        let wmOriginalImageData = null;
-        let wmIsDrawing = false;
-        let wmStartX = 0,
-            wmStartY = 0;
-        let wmRect = null;
-        let wmBrushPoints = [];
-        let wmMask = null;
-        let wmMaskDirty = false;
-        let wmProcessingResized = false;
 
         // ================================================================
-        // DOM REFS
+        // DOM REFS (Background)
         // ================================================================
         const loadingOverlay = document.getElementById('loadingOverlay');
         const loadingText = document.getElementById('loadingText');
@@ -1606,14 +1588,11 @@
         const bgResultSize = document.getElementById('bgResultSize');
         const bgResultFormat = document.getElementById('bgResultFormat');
         const bgResultStatus = document.getElementById('bgResultStatus');
-        const toleranceSlider = document.getElementById('toleranceSlider');
-        const toleranceValue = document.getElementById('toleranceValue');
-        const sampleColor = document.getElementById('sampleColor');
-        const pickColorBtn = document.getElementById('pickColorBtn');
         const removeBgBtn = document.getElementById('removeBgBtn');
         const downloadBgBtn = document.getElementById('downloadBgBtn');
         const resetBgBtn = document.getElementById('resetBgBtn');
 
+        // DOM REFS (Watermark)
         const uploadZoneWm = document.getElementById('uploadZoneWm');
         const fileInputWm = document.getElementById('fileInputWm');
         const errorMsgWm = document.getElementById('errorMsgWm');
@@ -1684,27 +1663,6 @@
             return new Blob([u8arr], { type: mime });
         }
 
-        function hexToRgb(hex) {
-            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-            return result ? {
-                r: parseInt(result[1], 16),
-                g: parseInt(result[2], 16),
-                b: parseInt(result[3], 16)
-            } : { r: 255, g: 255, b: 255 };
-        }
-
-        function rgbToHex(r, g, b) {
-            return '#' + [r, g, b].map(c => clamp(Math.round(c), 0, 255).toString(16).padStart(2, '0')).join('');
-        }
-
-        function resizeImageToMax(img, maxDimension) {
-            let w = img.width,
-                h = img.height;
-            if (w <= maxDimension && h <= maxDimension) return { width: w, height: h, scaled: false };
-            const ratio = Math.min(maxDimension / w, maxDimension / h);
-            return { width: Math.round(w * ratio), height: Math.round(h * ratio), scaled: true };
-        }
-
         // ================================================================
         // TAB SWITCHING
         // ================================================================
@@ -1720,8 +1678,6 @@
                 document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
                 document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
                 activeTab = btn.dataset.tab;
-
-                if (state.bg.pickMode) exitPickMode();
             });
         });
 
@@ -1777,56 +1733,9 @@
         }
 
         // ================================================================
-        // BACKGROUND REMOVAL ENGINE (Fixed)
+        // BACKGROUND TAB LOGIC (AI - UNCHANGED)
         // ================================================================
-        function processBackgroundRemoval(imageData, color, tolerance) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const height = imageData.height;
-            const totalPixels = width * height;
 
-            const baseRgb = hexToRgb(color);
-            const br = baseRgb.r,
-                bg = baseRgb.g,
-                bb = baseRgb.b;
-            const tol = tolerance / 100;
-            const threshold = Math.min(0.95, tol * 1.2 + 0.05);
-            const sigma = 0.08 + tol * 0.12;
-
-            const result = new Uint8ClampedArray(data);
-
-            for (let i = 0; i < totalPixels; i++) {
-                const idx = i * 4;
-                const pr = data[idx],
-                    pg = data[idx + 1],
-                    pb = data[idx + 2];
-                const dr = pr - br,
-                    dg = pg - bg,
-                    db = pb - bb;
-                const dist = Math.sqrt(0.299 * dr * dr + 0.587 * dg * dg + 0.114 * db * db) / 255;
-
-                let bgProb = 1 / (1 + Math.exp((dist - threshold) / sigma));
-                bgProb = clamp(bgProb, 0, 1);
-
-                // Edge refinement: compute local gradient
-                let edgeWeight = 1;
-                if (i > width && i < totalPixels - width && i % width > 0 && i % width < width - 1) {
-                    const gx = (data[(i + width) * 4] + 2 * data[(i + 1) * 4] + data[(i + width + 1) * 4]) -
-                        (data[(i - width) * 4] + 2 * data[(i - 1) * 4] + data[(i - width - 1) * 4]);
-                    const gy = (data[(i - width + 1) * 4] + 2 * data[i * 4] + data[(i + width + 1) * 4]) -
-                        (data[(i - width - 1) * 4] + 2 * data[i * 4] + data[(i + width - 1) * 4]);
-                    const grad = Math.sqrt(gx * gx + gy * gy) / 255;
-                    edgeWeight = 1 - Math.min(1, grad * 2.5);
-                }
-                const finalAlpha = bgProb * (0.3 + 0.7 * edgeWeight);
-                result[idx + 3] = Math.round((1 - clamp(finalAlpha, 0, 1)) * 255);
-            }
-            return result;
-        }
-
-        // ================================================================
-        // BACKGROUND TAB LOGIC (Fixed upload & preview)
-        // ================================================================
         function handleBgFile(file) {
             if (!file) return;
             const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -1845,10 +1754,8 @@
             if (state.bg.resultData?.url) revokeUrl(state.bg.resultData.url);
             state.bg.processed = false;
             state.bg.resultData = null;
-            state.bg.sampleRegion = null;
             removeBgBtn.disabled = true;
             downloadBgBtn.disabled = true;
-            exitPickMode();
 
             showLoading(true, 'Loading image...', 10);
 
@@ -1864,7 +1771,6 @@
                     format: file.type
                 };
 
-                // Display original
                 bgOriginalWrap.innerHTML = '';
                 const displayImg = document.createElement('img');
                 displayImg.src = url;
@@ -1882,21 +1788,6 @@
                 bgResultSize.textContent = '—';
                 bgResultStatus.textContent = '—';
 
-                // Setup pick mode canvas (hidden initially)
-                const pickCanvas = document.createElement('canvas');
-                pickCanvas.width = img.width;
-                pickCanvas.height = img.height;
-                pickCanvas.style.display = 'none';
-                pickCanvas.style.maxWidth = '100%';
-                pickCanvas.style.maxHeight = '450px';
-                pickCanvas.style.objectFit = 'contain';
-                pickCanvas.style.cursor = 'crosshair';
-                bgOriginalWrap.appendChild(pickCanvas);
-                const ctx = pickCanvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
-                bgCanvasForPick = pickCanvas;
-                bgCtxForPick = ctx;
-
                 removeBgBtn.disabled = false;
                 showLoading(false, 'Image loaded', 100);
             };
@@ -1908,124 +1799,41 @@
             img.src = url;
         }
 
-        function exitPickMode() {
-            state.bg.pickMode = false;
-            pickColorBtn.textContent = '🎯 Pick';
-            pickColorBtn.classList.remove('btn-danger');
-            pickColorBtn.classList.add('btn-outline');
-            document.body.classList.remove('pick-mode-active');
-
-            if (bgCanvasForPick) {
-                bgCanvasForPick.style.display = 'none';
-                const imgEl = bgOriginalWrap.querySelector('img');
-                if (imgEl) imgEl.style.display = 'block';
-                bgCanvasForPick.removeEventListener('click', onPickClick);
-                bgCanvasForPick.style.cursor = 'default';
-            }
-            bgOriginalWrap.removeEventListener('click', onPickClickWrapper);
-            errorMsgBg.classList.remove('show');
-        }
-
-        function onPickClickWrapper(e) {
-            if (!state.bg.pickMode) return;
-            const canvas = bgOriginalWrap.querySelector('canvas');
-            if (canvas && canvas.style.display !== 'none') {
-                const rect = canvas.getBoundingClientRect();
-                const scaleX = canvas.width / rect.width;
-                const scaleY = canvas.height / rect.height;
-                const x = clamp((e.clientX - rect.left) * scaleX, 0, canvas.width - 1);
-                const y = clamp((e.clientY - rect.top) * scaleY, 0, canvas.height - 1);
-                sampleColorFromCanvas(canvas, Math.round(x), Math.round(y));
-            }
-        }
-
-        function onPickClick(e) {
-            if (!state.bg.pickMode) return;
-            const canvas = e.currentTarget;
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const x = clamp((e.clientX - rect.left) * scaleX, 0, canvas.width - 1);
-            const y = clamp((e.clientY - rect.top) * scaleY, 0, canvas.height - 1);
-            sampleColorFromCanvas(canvas, Math.round(x), Math.round(y));
-        }
-
-        function sampleColorFromCanvas(canvas, x, y) {
-            const ctx = canvas.getContext('2d');
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-            const samples = [];
-            const radius = 3;
-            for (let dy = -radius; dy <= radius; dy++) {
-                for (let dx = -radius; dx <= radius; dx++) {
-                    const sx = clamp(x + dx, 0, canvas.width - 1);
-                    const sy = clamp(y + dy, 0, canvas.height - 1);
-                    const si = (sy * canvas.width + sx) * 4;
-                    samples.push({ r: data[si], g: data[si + 1], b: data[si + 2] });
-                }
-            }
-            let sumR = 0,
-                sumG = 0,
-                sumB = 0;
-            for (const s of samples) {
-                sumR += s.r;
-                sumG += s.g;
-                sumB += s.b;
-            }
-            const avgR = Math.round(sumR / samples.length);
-            const avgG = Math.round(sumG / samples.length);
-            const avgB = Math.round(sumB / samples.length);
-            const hex = rgbToHex(avgR, avgG, avgB);
-            sampleColor.value = hex;
-            state.bg.sampleColor = hex;
-            state.bg.sampleRegion = { x: Math.max(0, x - 8), y: Math.max(0, y - 8), w: 16, h: 16 };
-            showError(errorMsgBg, `✅ Sampled: ${hex}  (${avgR}, ${avgG}, ${avgB})`);
-            exitPickMode();
-            setTimeout(() => {
-                if (state.bg.originalData) performBgRemoval();
-            }, 300);
-        }
-
-        function performBgRemoval() {
+        async function performBgRemoval() {
             if (!state.bg.originalData) return;
-            if (state.bg.pickMode) exitPickMode();
-            showLoading(true, 'Analyzing image...', 5);
-
-            const img = new Image();
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                ctx.drawImage(img, 0, 0);
-                updateProgress('Removing background...', 30);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const color = sampleColor.value;
-                const tolerance = parseInt(toleranceSlider.value);
-                const processedData = processBackgroundRemoval(imageData, color, tolerance);
-                const newImageData = new ImageData(processedData, canvas.width, canvas.height);
-                ctx.putImageData(newImageData, 0, 0);
-                updateProgress('Generating output...', 90);
-                const resultUrl = canvas.toDataURL('image/png');
-                const resultBlob = dataURLToBlob(resultUrl);
+            showLoading(true, 'AI is analyzing the subject...', 5);
+            try {
+                const response = await fetch(state.bg.originalData.url);
+                const imageBlob = await response.blob();
+                const resultBlob = await removeBackground(imageBlob, {
+                    progress: (progress) => {
+                        const pct = Math.round(progress * 90);
+                        updateProgress(`AI removing background... ${pct}%`, 5 + pct);
+                    },
+                    output: { format: 'png' }
+                });
+                updateProgress('Finalizing result...', 95);
+                const resultUrl = URL.createObjectURL(resultBlob);
                 if (state.bg.resultData?.url) revokeUrl(state.bg.resultData.url);
                 state.bg.resultData = {
-                    url: URL.createObjectURL(resultBlob),
+                    url: resultUrl,
                     size: resultBlob.size,
                     format: 'image/png'
                 };
                 state.bg.processed = true;
                 bgResultWrap.innerHTML =
-                `<img src="${state.bg.resultData.url}" alt="Result" style="max-width:100%;max-height:450px;object-fit:contain;" />`;
+                    `<img src="${resultUrl}" alt="Result" style="max-width:100%;max-height:450px;object-fit:contain;" />`;
                 bgResultSize.textContent = formatFileSize(resultBlob.size);
                 bgResultFormat.textContent = 'PNG';
-                bgResultStatus.textContent = '✅ Background removed';
+                bgResultStatus.textContent = '✅ Background removed with AI';
                 downloadBgBtn.disabled = false;
                 showLoading(false, 'Done!', 100);
-            };
-            img.onerror = () => { showLoading(false);
-                showError(errorMsgBg, 'Failed to process image.'); };
-            img.src = state.bg.originalData.url;
+            } catch (err) {
+                console.error(err);
+                showLoading(false);
+                showError(errorMsgBg, 'AI processing failed: ' + err.message);
+                removeBgBtn.disabled = false;
+            }
         }
 
         function downloadBgResult() {
@@ -2046,9 +1854,6 @@
             state.bg.originalData = null;
             state.bg.resultData = null;
             state.bg.processed = false;
-            state.bg.sampleRegion = null;
-            bgCanvasForPick = null;
-            bgCtxForPick = null;
             bgOriginalWrap.innerHTML = `<div class="placeholder">No image uploaded yet</div>`;
             bgOriginalSize.textContent = '—';
             bgOriginalFormat.textContent = '—';
@@ -2061,32 +1866,8 @@
             downloadBgBtn.disabled = true;
             fileInputBg.value = '';
             errorMsgBg.classList.remove('show');
-            exitPickMode();
             showLoading(false);
         }
-
-        pickColorBtn.addEventListener('click', () => {
-            if (state.bg.pickMode) { exitPickMode(); } else {
-                if (!state.bg.originalData) { showError(errorMsgBg, 'Please upload an image first.'); return; }
-                state.bg.pickMode = true;
-                pickColorBtn.textContent = '❌ Cancel';
-                pickColorBtn.classList.remove('btn-outline');
-                pickColorBtn.classList.add('btn-danger');
-                document.body.classList.add('pick-mode-active');
-                if (bgCanvasForPick) {
-                    bgCanvasForPick.style.display = 'block';
-                    const imgEl = bgOriginalWrap.querySelector('img');
-                    if (imgEl) imgEl.style.display = 'none';
-                    bgCanvasForPick.addEventListener('click', onPickClick);
-                    bgCanvasForPick.style.cursor = 'crosshair';
-                }
-                bgOriginalWrap.addEventListener('click', onPickClickWrapper);
-                showError(errorMsgBg, '🎯 Click on the background area to sample color.');
-            }
-        });
-        removeBgBtn.addEventListener('click', performBgRemoval);
-        downloadBgBtn.addEventListener('click', downloadBgResult);
-        resetBgBtn.addEventListener('click', resetBg);
 
         fileInputBg.addEventListener('change', (e) => {
             if (e.target.files.length > 0) handleBgFile(e.target.files[0]);
@@ -2100,209 +1881,61 @@
             uploadZoneBg.classList.remove('dragover');
             if (e.dataTransfer.files.length > 0) handleBgFile(e.dataTransfer.files[0]);
         });
-        toleranceSlider.addEventListener('input', () => { toleranceValue.textContent = toleranceSlider.value; });
+        removeBgBtn.addEventListener('click', performBgRemoval);
+        downloadBgBtn.addEventListener('click', downloadBgResult);
+        resetBgBtn.addEventListener('click', resetBg);
 
         // ================================================================
         // ================================================================
-        // IMPROVED LOGO / WATERMARK REMOVER (Optimized Speed)
+        // IMPROVED LOGO REMOVER (Enhanced Detection + Inpainting)
         // ================================================================
         // ================================================================
 
-        // ================================================================
-        // OPTIMIZED INPAINTING ENGINE (Faster, with image resizing)
-        // ================================================================
-
-        function inpaintImageOptimized(imageData, mask, patchSize, onProgress) {
-            const data = imageData.data;
-            const width = imageData.width;
-            const height = imageData.height;
-            const totalPixels = width * height;
-
-            const original = new Uint8ClampedArray(data);
-            const result = new Uint8ClampedArray(data);
-
-            // Collect masked pixels
-            const maskedPixels = [];
-            for (let i = 0; i < totalPixels; i++) {
-                if (mask[i] > 0) maskedPixels.push(i);
-            }
-
-            if (maskedPixels.length === 0) return result;
-
-            // Use a working mask that we'll update as we fill
-            const workingMask = new Uint8Array(mask);
-
-            // Multi-scale: use 2 passes for speed
-            const patchSizes = [
-                Math.max(8, Math.round(patchSize * 1.3)),
-                Math.max(4, Math.round(patchSize * 0.7))
-            ];
-
-            let processed = 0;
-            const totalSteps = maskedPixels.length * patchSizes.length;
-
-            for (let pass = 0; pass < patchSizes.length; pass++) {
-                const currentPatchSize = patchSizes[pass];
-                const halfPatch = Math.max(1, Math.floor(currentPatchSize / 2));
-                const searchRadius = Math.max(8, currentPatchSize * 2 - pass * 2);
-
-                // Shuffle for better convergence
-                const shuffled = [...maskedPixels];
-                for (let i = shuffled.length - 1; i > 0; i--) {
-                    const j = Math.floor(Math.random() * (i + 1));
-                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-                }
-
-                for (let mi = 0; mi < shuffled.length; mi++) {
-                    const idx = shuffled[mi];
-                    if (pass > 0 && workingMask[idx] === 0) continue;
-
-                    const px = idx % width;
-                    const py = Math.floor(idx / width);
-
-                    // Use random sampling for speed: sample candidates from the search radius
-                    let bestScore = Infinity;
-                    let bestSx = px,
-                        bestSy = py;
-                    const numSamples = Math.min(60, searchRadius * 2);
-
-                    for (let s = 0; s < numSamples; s++) {
-                        const dx = Math.round((Math.random() - 0.5) * searchRadius * 2);
-                        const dy = Math.round((Math.random() - 0.5) * searchRadius * 2);
-                        const sx = clamp(px + dx, halfPatch, width - halfPatch - 1);
-                        const sy = clamp(py + dy, halfPatch, height - halfPatch - 1);
-                        const sidx = sy * width + sx;
-
-                        // Prefer unmasked sources, but allow previously filled in later passes
-                        if (pass === 0 && workingMask[sidx] > 0) continue;
-
-                        // Compute patch similarity using a subset of pixels for speed
-                        let score = 0;
-                        let sampleCount = 0;
-                        const step = Math.max(1, Math.floor(currentPatchSize / 4));
-
-                        for (let dy2 = -halfPatch; dy2 <= halfPatch; dy2 += step) {
-                            for (let dx2 = -halfPatch; dx2 <= halfPatch; dx2 += step) {
-                                const ny = clamp(py + dy2, 0, height - 1);
-                                const nx = clamp(px + dx2, 0, width - 1);
-                                const sy2 = clamp(sy + dy2, 0, height - 1);
-                                const sx2 = clamp(sx + dx2, 0, width - 1);
-
-                                const nidx = ny * width + nx;
-                                const sidx2 = sy2 * width + sx2;
-
-                                const targetData = (workingMask[nidx] > 0 && pass === 0) ? original : result;
-                                const sourceData = (workingMask[sidx2] > 0 && pass === 0) ? original : result;
-
-                                const ti = nidx * 4;
-                                const si = sidx2 * 4;
-                                const dr = targetData[ti] - sourceData[si];
-                                const dg = targetData[ti + 1] - sourceData[si + 1];
-                                const db = targetData[ti + 2] - sourceData[si + 2];
-                                score += (dr * dr + dg * dg + db * db);
-                                sampleCount++;
-                            }
-                        }
-
-                        if (sampleCount > 0) {
-                            score /= sampleCount;
-                            const distBias = (Math.abs(dx) + Math.abs(dy)) * 0.5;
-                            score += distBias * 0.4;
-                            if (score < bestScore) {
-                                bestScore = score;
-                                bestSx = sx;
-                                bestSy = sy;
-                            }
-                        }
-                    }
-
-                    // Copy the best matching patch
-                    const srcIdx = bestSy * width + bestSx;
-                    const srcData = (workingMask[srcIdx] > 0 && pass === 0) ? original : result;
-
-                    const di = idx * 4;
-                    const si2 = srcIdx * 4;
-                    result[di] = srcData[si2];
-                    result[di + 1] = srcData[si2 + 1];
-                    result[di + 2] = srcData[si2 + 2];
-                    result[di + 3] = original[di + 3];
-
-                    workingMask[idx] = 0;
-                    processed++;
-
-                    if (onProgress && processed % 50 === 0) {
-                        const pct = 10 + (processed / totalSteps) * 80;
-                        onProgress(Math.min(90, pct));
-                    }
-                }
-            }
-
-            // Final smoothing pass (fast)
-            const smoothed = new Uint8ClampedArray(result);
-            for (let i = 0; i < maskedPixels.length; i++) {
-                const idx = maskedPixels[i];
-                const x = idx % width;
-                const y = Math.floor(idx / width);
-                let sumR = 0,
-                    sumG = 0,
-                    sumB = 0,
-                    count = 0;
-                for (let dy = -1; dy <= 1; dy++) {
-                    for (let dx = -1; dx <= 1; dx++) {
-                        const nx = clamp(x + dx, 0, width - 1);
-                        const ny = clamp(y + dy, 0, height - 1);
-                        const ni = ny * width + nx;
-                        const ni4 = ni * 4;
-                        sumR += result[ni4];
-                        sumG += result[ni4 + 1];
-                        sumB += result[ni4 + 2];
-                        count++;
-                    }
-                }
-                if (count > 0) {
-                    const di = idx * 4;
-                    smoothed[di] = Math.round(sumR / count);
-                    smoothed[di + 1] = Math.round(sumG / count);
-                    smoothed[di + 2] = Math.round(sumB / count);
-                }
-            }
-
-            return smoothed;
+        // ----- Helper for skin color detection -----
+        function isSkinColor(r, g, b) {
+            // Convert to YCbCr for skin detection
+            const y = 0.299 * r + 0.587 * g + 0.114 * b;
+            const cb = 128 + (-0.168736 * r - 0.331264 * g + 0.5 * b);
+            const cr = 128 + (0.5 * r - 0.418688 * g - 0.081312 * b);
+            // Common skin range in YCbCr
+            return (y > 80 && y < 230 && cb > 77 && cb < 127 && cr > 133 && cr < 173);
         }
 
-        // ================================================================
-        // AUTO DETECTION ENGINE (Optimized)
-        // ================================================================
-        function detectLogosFast(imageData) {
+        // ----- Improved detection engine -----
+        function detectLogosEnhanced(imageData) {
             const data = imageData.data;
             const width = imageData.width;
             const height = imageData.height;
             const totalPixels = width * height;
 
-            // Convert to grayscale
-            const gray = new Uint8Array(totalPixels);
+            // Convert to grayscale and also collect RGB for skin & color uniformity
+            const gray = new Float32Array(totalPixels);
+            const rgb = new Uint8Array(totalPixels * 3);
             for (let i = 0; i < totalPixels; i++) {
                 const idx = i * 4;
-                gray[i] = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
+                const r = data[idx],
+                    g = data[idx + 1],
+                    b = data[idx + 2];
+                rgb[i * 3] = r;
+                rgb[i * 3 + 1] = g;
+                rgb[i * 3 + 2] = b;
+                gray[i] = 0.299 * r + 0.587 * g + 0.114 * b;
             }
 
-            // Compute edge strength (simplified Sobel)
+            // 1. Edge strength (Sobel)
             const edgeStrength = new Float32Array(totalPixels);
             for (let y = 1; y < height - 1; y++) {
                 for (let x = 1; x < width - 1; x++) {
                     const idx = y * width + x;
-                    const gx = (gray[(y + 1) * width + x - 1] + 2 * gray[(y + 1) * width + x] + gray[(y + 1) * width + x +
-                        1]) -
-                        (gray[(y - 1) * width + x - 1] + 2 * gray[(y - 1) * width + x] + gray[(y - 1) * width + x +
-                        1]);
-                    const gy = (gray[(y - 1) * width + x + 1] + 2 * gray[y * width + x + 1] + gray[(y + 1) * width + x +
-                        1]) -
+                    const gx = (gray[(y + 1) * width + x - 1] + 2 * gray[(y + 1) * width + x] + gray[(y + 1) * width + x + 1]) -
+                        (gray[(y - 1) * width + x - 1] + 2 * gray[(y - 1) * width + x] + gray[(y - 1) * width + x + 1]);
+                    const gy = (gray[(y - 1) * width + x + 1] + 2 * gray[y * width + x + 1] + gray[(y + 1) * width + x + 1]) -
                         (gray[(y - 1) * width + x - 1] + 2 * gray[y * width + x - 1] + gray[(y + 1) * width + x - 1]);
                     edgeStrength[idx] = Math.sqrt(gx * gx + gy * gy);
                 }
             }
 
-            // Compute local variance
+            // 2. Local variance (texture)
             const variance = new Float32Array(totalPixels);
             const halfW = 3;
             for (let y = halfW; y < height - halfW; y++) {
@@ -2325,13 +1958,50 @@
                 }
             }
 
-            // Find regions with high edge density
-            const mask = new Uint8Array(totalPixels);
-            const edgeThreshold = 35;
-            const varThreshold = 60;
-            const densityWindow = 6;
-            const halfDW = Math.floor(densityWindow / 2);
+            // 3. Color uniformity: low variance in HSV or RGB (logos often have uniform colors)
+            const colorUniformity = new Float32Array(totalPixels);
+            for (let y = halfW; y < height - halfW; y++) {
+                for (let x = halfW; x < width - halfW; x++) {
+                    const idx = y * width + x;
+                    let sumR = 0,
+                        sumG = 0,
+                        sumB = 0,
+                        count = 0;
+                    for (let dy = -halfW; dy <= halfW; dy++) {
+                        for (let dx = -halfW; dx <= halfW; dx++) {
+                            const ni = (y + dy) * width + (x + dx);
+                            const i3 = ni * 3;
+                            sumR += rgb[i3];
+                            sumG += rgb[i3 + 1];
+                            sumB += rgb[i3 + 2];
+                            count++;
+                        }
+                    }
+                    const meanR = sumR / count,
+                        meanG = sumG / count,
+                        meanB = sumB / count;
+                    let varR = 0,
+                        varG = 0,
+                        varB = 0;
+                    for (let dy = -halfW; dy <= halfW; dy++) {
+                        for (let dx = -halfW; dx <= halfW; dx++) {
+                            const ni = (y + dy) * width + (x + dx);
+                            const i3 = ni * 3;
+                            varR += (rgb[i3] - meanR) ** 2;
+                            varG += (rgb[i3 + 1] - meanG) ** 2;
+                            varB += (rgb[i3 + 2] - meanB) ** 2;
+                        }
+                    }
+                    const totalVar = (varR + varG + varB) / count;
+                    colorUniformity[idx] = 1 / (1 + totalVar / 500); // high = uniform
+                }
+            }
 
+            // 4. High-frequency content (text/logo often has sharp transitions)
+            // Use Laplacian or just edge density
+            const edgeDensity = new Float32Array(totalPixels);
+            const densityWin = 5;
+            const halfDW = Math.floor(densityWin / 2);
             for (let y = halfDW; y < height - halfDW; y++) {
                 for (let x = halfDW; x < width - halfDW; x++) {
                     const idx = y * width + x;
@@ -2340,42 +2010,313 @@
                     for (let dy = -halfDW; dy <= halfDW; dy++) {
                         for (let dx = -halfDW; dx <= halfDW; dx++) {
                             const ni = (y + dy) * width + (x + dx);
-                            if (edgeStrength[ni] > edgeThreshold) edgeCount++;
+                            if (edgeStrength[ni] > 30) edgeCount++;
                             total++;
                         }
                     }
-                    const density = edgeCount / total;
-                    if (density > 0.12 && variance[idx] > varThreshold) {
-                        mask[idx] = 1;
-                    }
+                    edgeDensity[idx] = edgeCount / total;
                 }
             }
 
-            // Clean up small regions
-            const cleaned = new Uint8Array(totalPixels);
-            for (let y = 1; y < height - 1; y++) {
-                for (let x = 1; x < width - 1; x++) {
-                    const idx = y * width + x;
-                    if (mask[idx] > 0) {
-                        let neighbors = 0;
+            // Combine scores: logo = high edge density + high variance + high color uniformity + not skin
+            const logoScore = new Float32Array(totalPixels);
+            for (let i = 0; i < totalPixels; i++) {
+                const ed = edgeDensity[i] || 0;
+                const varScore = Math.min(1, variance[i] / 200);
+                const uniScore = colorUniformity[i] || 0;
+                // Skin penalty
+                const i3 = i * 3;
+                const isSkin = isSkinColor(rgb[i3], rgb[i3 + 1], rgb[i3 + 2]) ? 0.3 : 1.0;
+                // Combine: give more weight to edge density and uniformity
+                let score = (ed * 0.5 + varScore * 0.2 + uniScore * 0.3) * isSkin;
+                // Boost if high edge density and high uniformity (typical logo)
+                if (ed > 0.3 && uniScore > 0.6) score *= 1.5;
+                logoScore[i] = Math.min(1, score);
+            }
+
+            // Threshold and create mask
+            const mask = new Uint8Array(totalPixels);
+            const threshold = 0.45;
+            for (let i = 0; i < totalPixels; i++) {
+                if (logoScore[i] > threshold) mask[i] = 1;
+            }
+
+            // ---- Post-processing: remove small regions, border regions, and large areas ----
+            // Connected component analysis
+            const visited = new Uint8Array(totalPixels);
+            const regions = [];
+            for (let i = 0; i < totalPixels; i++) {
+                if (mask[i] > 0 && visited[i] === 0) {
+                    const queue = [i];
+                    visited[i] = 1;
+                    const region = [];
+                    while (queue.length) {
+                        const idx = queue.shift();
+                        region.push(idx);
+                        const x = idx % width;
+                        const y = Math.floor(idx / width);
+                        // 8-neighbor
                         for (let dy = -1; dy <= 1; dy++) {
                             for (let dx = -1; dx <= 1; dx++) {
                                 if (dx === 0 && dy === 0) continue;
-                                const ni = (y + dy) * width + (x + dx);
-                                if (mask[ni] > 0) neighbors++;
+                                const nx = x + dx,
+                                    ny = y + dy;
+                                if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                    const ni = ny * width + nx;
+                                    if (mask[ni] > 0 && visited[ni] === 0) {
+                                        visited[ni] = 1;
+                                        queue.push(ni);
+                                    }
+                                }
                             }
                         }
-                        if (neighbors >= 2) cleaned[idx] = 1;
+                    }
+                    if (region.length > 10) regions.push(region);
+                }
+            }
+
+            // Filter regions
+            const finalMask = new Uint8Array(totalPixels);
+            const totalArea = width * height;
+            for (const region of regions) {
+                // Compute bounding box and area
+                let minX = width,
+                    maxX = 0,
+                    minY = height,
+                    maxY = 0;
+                for (const idx of region) {
+                    const x = idx % width;
+                    const y = Math.floor(idx / width);
+                    if (x < minX) minX = x;
+                    if (x > maxX) maxX = x;
+                    if (y < minY) minY = y;
+                    if (y > maxY) maxY = y;
+                }
+                const rw = maxX - minX + 1;
+                const rh = maxY - minY + 1;
+                const area = region.length;
+                const bboxArea = rw * rh;
+                // Reject if too small, too large (>40% of image), or touches border (often background)
+                if (area < 20 || area > totalArea * 0.4) continue;
+                if (minX < 3 || maxX >= width - 3 || minY < 3 || maxY >= height - 3) continue;
+                // Reject if aspect ratio too extreme (not logo-like)
+                const aspect = Math.max(rw, rh) / Math.min(rw, rh);
+                if (aspect > 6) continue;
+                // Accept
+                for (const idx of region) {
+                    finalMask[idx] = 1;
+                }
+            }
+
+            // Optional: dilate slightly to cover edges
+            const dilated = new Uint8Array(finalMask);
+            const dilateRadius = 2;
+            for (let i = 0; i < totalPixels; i++) {
+                if (finalMask[i] > 0) {
+                    const x = i % width;
+                    const y = Math.floor(i / width);
+                    for (let dy = -dilateRadius; dy <= dilateRadius; dy++) {
+                        for (let dx = -dilateRadius; dx <= dilateRadius; dx++) {
+                            const nx = x + dx,
+                                ny = y + dy;
+                            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                                dilated[ny * width + nx] = 1;
+                            }
+                        }
                     }
                 }
             }
 
-            return cleaned;
+            return dilated;
         }
 
-        // ================================================================
-        // WM TAB LOGIC (Optimized)
-        // ================================================================
+        // ----- Improved Inpainting (higher quality, faster) -----
+        function inpaintImageOptimized(imageData, mask, patchSize, onProgress) {
+            const data = imageData.data;
+            const width = imageData.width;
+            const height = imageData.height;
+            const totalPixels = width * height;
+
+            const original = new Uint8ClampedArray(data);
+            const result = new Uint8ClampedArray(data);
+
+            const maskedPixels = [];
+            for (let i = 0; i < totalPixels; i++) {
+                if (mask[i] > 0) maskedPixels.push(i);
+            }
+            if (maskedPixels.length === 0) return result;
+
+            const workingMask = new Uint8Array(mask);
+
+            // Multi-scale: coarse to fine
+            const patchSizes = [
+                Math.max(10, Math.round(patchSize * 1.4)),
+                Math.max(6, Math.round(patchSize * 0.9)),
+                Math.max(4, Math.round(patchSize * 0.6))
+            ];
+
+            let processed = 0;
+            const totalSteps = maskedPixels.length * patchSizes.length;
+
+            for (let pass = 0; pass < patchSizes.length; pass++) {
+                const currentPatchSize = patchSizes[pass];
+                const halfPatch = Math.max(1, Math.floor(currentPatchSize / 2));
+                const searchRadius = Math.max(10, currentPatchSize * 2 - pass * 2);
+
+                const shuffled = [...maskedPixels];
+                for (let i = shuffled.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                }
+
+                for (let mi = 0; mi < shuffled.length; mi++) {
+                    const idx = shuffled[mi];
+                    if (pass > 0 && workingMask[idx] === 0) continue;
+
+                    const px = idx % width;
+                    const py = Math.floor(idx / width);
+
+                    let bestScore = Infinity;
+                    let bestSx = px,
+                        bestSy = py;
+                    // Use more samples for first pass, fewer for refinement
+                    const numSamples = Math.min(80, (pass === 0 ? 80 : 40) + searchRadius);
+
+                    for (let s = 0; s < numSamples; s++) {
+                        const dx = Math.round((Math.random() - 0.5) * searchRadius * 2);
+                        const dy = Math.round((Math.random() - 0.5) * searchRadius * 2);
+                        const sx = clamp(px + dx, halfPatch, width - halfPatch - 1);
+                        const sy = clamp(py + dy, halfPatch, height - halfPatch - 1);
+                        const sidx = sy * width + sx;
+
+                        if (pass === 0 && workingMask[sidx] > 0) continue;
+
+                        // Compute patch similarity with gradient weighting
+                        let score = 0;
+                        let sampleCount = 0;
+                        const step = Math.max(1, Math.floor(currentPatchSize / 5));
+
+                        for (let dy2 = -halfPatch; dy2 <= halfPatch; dy2 += step) {
+                            for (let dx2 = -halfPatch; dx2 <= halfPatch; dx2 += step) {
+                                const ny = clamp(py + dy2, 0, height - 1);
+                                const nx = clamp(px + dx2, 0, width - 1);
+                                const sy2 = clamp(sy + dy2, 0, height - 1);
+                                const sx2 = clamp(sx + dx2, 0, width - 1);
+
+                                const nidx = ny * width + nx;
+                                const sidx2 = sy2 * width + sx2;
+
+                                const targetData = (workingMask[nidx] > 0 && pass === 0) ? original : result;
+                                const sourceData = (workingMask[sidx2] > 0 && pass === 0) ? original : result;
+
+                                const ti = nidx * 4;
+                                const si = sidx2 * 4;
+                                const dr = targetData[ti] - sourceData[si];
+                                const dg = targetData[ti + 1] - sourceData[si + 1];
+                                const db = targetData[ti + 2] - sourceData[si + 2];
+                                // Weight by distance from center (center more important)
+                                const distWeight = 1 - Math.sqrt(dx2 * dx2 + dy2 * dy2) / (halfPatch * 1.5);
+                                const w = Math.max(0.3, distWeight);
+                                score += w * (dr * dr + dg * dg + db * db);
+                                sampleCount++;
+                            }
+                        }
+
+                        if (sampleCount > 0) {
+                            score /= sampleCount;
+                            const distBias = (Math.abs(dx) + Math.abs(dy)) * 0.3;
+                            score += distBias;
+                            if (score < bestScore) {
+                                bestScore = score;
+                                bestSx = sx;
+                                bestSy = sy;
+                            }
+                        }
+                    }
+
+                    // Copy patch
+                    const srcIdx = bestSy * width + bestSx;
+                    const srcData = (workingMask[srcIdx] > 0 && pass === 0) ? original : result;
+
+                    const di = idx * 4;
+                    const si2 = srcIdx * 4;
+                    result[di] = srcData[si2];
+                    result[di + 1] = srcData[si2 + 1];
+                    result[di + 2] = srcData[si2 + 2];
+                    result[di + 3] = original[di + 3];
+
+                    workingMask[idx] = 0;
+                    processed++;
+
+                    if (onProgress && processed % 40 === 0) {
+                        const pct = 10 + (processed / totalSteps) * 80;
+                        onProgress(Math.min(90, pct));
+                    }
+                }
+            }
+
+            // Final edge-preserving smoothing using weighted median filter on mask boundary
+            const smoothed = new Uint8ClampedArray(result);
+            const blurRadius = 2;
+            for (let i = 0; i < maskedPixels.length; i++) {
+                const idx = maskedPixels[i];
+                const x = idx % width;
+                const y = Math.floor(idx / width);
+                // Only apply smoothing if near boundary (to preserve details)
+                let isBoundary = false;
+                for (let dy = -1; dy <= 1 && !isBoundary; dy++) {
+                    for (let dx = -1; dx <= 1 && !isBoundary; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = clamp(x + dx, 0, width - 1);
+                        const ny = clamp(y + dy, 0, height - 1);
+                        const ni = ny * width + nx;
+                        if (mask[ni] === 0) isBoundary = true;
+                    }
+                }
+                if (!isBoundary) continue;
+
+                let sumR = 0,
+                    sumG = 0,
+                    sumB = 0,
+                    count = 0;
+                for (let dy = -blurRadius; dy <= blurRadius; dy++) {
+                    for (let dx = -blurRadius; dx <= blurRadius; dx++) {
+                        const nx = clamp(x + dx, 0, width - 1);
+                        const ny = clamp(y + dy, 0, height - 1);
+                        const ni = ny * width + nx;
+                        const ni4 = ni * 4;
+                        // Weight by spatial distance and color similarity
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        const colorDist = Math.abs(result[ni4] - result[idx * 4]) +
+                            Math.abs(result[ni4 + 1] - result[idx * 4 + 1]) +
+                            Math.abs(result[ni4 + 2] - result[idx * 4 + 2]);
+                        const w = Math.exp(-dist / 2) * Math.exp(-colorDist / 60);
+                        sumR += result[ni4] * w;
+                        sumG += result[ni4 + 1] * w;
+                        sumB += result[ni4 + 2] * w;
+                        count += w;
+                    }
+                }
+                if (count > 0) {
+                    const di = idx * 4;
+                    smoothed[di] = Math.round(sumR / count);
+                    smoothed[di + 1] = Math.round(sumG / count);
+                    smoothed[di + 2] = Math.round(sumB / count);
+                }
+            }
+
+            return smoothed;
+        }
+
+        // ----- Logo Remover UI logic (unchanged except using improved functions) -----
+        let wmCanvas = null;
+        let wmCtx = null;
+        let wmImageData = null;
+        let wmOriginalImageData = null;
+        let wmMask = null;
+        let wmRect = null;
+        let wmBrushPoints = [];
+        let wmProcessingResized = false;
 
         function handleWmFile(file) {
             if (!file) return;
@@ -2402,7 +2343,6 @@
             wmRect = null;
             wmBrushPoints = [];
             wmMask = null;
-            wmMaskDirty = false;
             removeWmBtn.disabled = true;
             downloadWmBtn.disabled = true;
 
@@ -2420,7 +2360,6 @@
                     format: file.type
                 };
 
-                // Check if we need to resize for processing
                 const maxDim = 1600;
                 const needsResize = img.width > maxDim || img.height > maxDim;
                 let displayW = img.width,
@@ -2443,7 +2382,6 @@
                     wmProcessingResized = false;
                 }
 
-                // Set up canvas
                 const wrap = wmOriginalWrap;
                 wrap.innerHTML = '';
 
@@ -2471,12 +2409,11 @@
                 hint.className = 'selection-hint';
                 hint.textContent = state.wm.mode === 'rectangle' ? '▭ Drag to draw a rectangle around the logo' :
                     state.wm.mode === 'brush' ? '✏️ Paint over the logo' :
-                    '🤖 Auto-detecting logos...';
+                    '🤖 AI detecting logos...';
                 container.appendChild(hint);
                 wrap.appendChild(container);
 
                 const ctx = canvas.getContext('2d');
-                // Draw the image (resized if needed)
                 if (needsResize) {
                     const tempCanvas = document.createElement('canvas');
                     tempCanvas.width = processW;
@@ -2494,7 +2431,6 @@
                 wmOriginalImageData = new Uint8ClampedArray(wmImageData.data);
                 canvas.dataset.originalData = canvas.toDataURL();
 
-                // Store original dimensions for final output
                 state.wm.originalWidth = img.width;
                 state.wm.originalHeight = img.height;
 
@@ -2510,7 +2446,7 @@
                 setupWmCanvasEvents(canvas);
 
                 if (state.wm.mode === 'auto') {
-                    setTimeout(() => runAutoDetectionFast(canvas), 300);
+                    setTimeout(() => runAutoDetectionEnhanced(canvas), 300);
                 }
 
                 removeWmBtn.disabled = false;
@@ -2537,7 +2473,6 @@
                 wmImageData = imageData;
                 wmOriginalImageData = new Uint8ClampedArray(imageData.data);
                 wmMask = new Uint8Array(wmCanvas.width * wmCanvas.height);
-                wmMaskDirty = false;
                 if (state.wm.mode === 'auto' && state.wm.autoDetected) {
                     drawMaskOverlay();
                 }
@@ -2550,7 +2485,7 @@
             else if (mode === 'auto') setupAutoMode(newCanvas);
         }
 
-        // ---------- RECTANGLE MODE ----------
+        // ----- Rectangle Mode (unchanged) -----
         function setupRectMode(canvas) {
             let isDown = false;
             let startX = 0,
@@ -2574,16 +2509,13 @@
                 const pos = getPos(e);
                 startX = pos.x;
                 startY = pos.y;
-                wmStartX = startX;
-                wmStartY = startY;
                 wmRect = null;
                 state.wm.selection = null;
                 wmMask = new Uint8Array(canvas.width * canvas.height);
-                wmMaskDirty = false;
                 const img = new Image();
                 img.onload = () => {
                     wmCtx.drawImage(img, 0, 0);
-                    updateHint('▭ Drag to draw a rectangle around the logo');
+                    updateHintWm('▭ Drag to draw a rectangle around the logo');
                 };
                 img.src = canvas.dataset.originalData || state.wm.originalData.url;
             };
@@ -2631,18 +2563,16 @@
                         }
                     }
                     wmMask = mask;
-                    wmMaskDirty = true;
                     removeWmBtn.disabled = false;
                     wmResultStatus.textContent = `📍 Selection: ${Math.round(w)}×${Math.round(h)}px`;
-                    updateHint(`✅ Logo area selected (${Math.round(w)}×${Math.round(h)}px)`);
+                    updateHintWm(`✅ Logo area selected (${Math.round(w)}×${Math.round(h)}px)`);
                 } else {
                     wmRect = null;
                     state.wm.selection = null;
                     wmMask = new Uint8Array(canvas.width * canvas.height);
-                    wmMaskDirty = false;
                     const img = new Image();
                     img.onload = () => { wmCtx.drawImage(img, 0, 0);
-                        updateHint('▭ Drag to draw a rectangle around the logo'); };
+                        updateHintWm('▭ Drag to draw a rectangle around the logo'); };
                     img.src = canvas.dataset.originalData || state.wm.originalData.url;
                     wmResultStatus.textContent = '—';
                 }
@@ -2655,10 +2585,10 @@
             canvas.addEventListener('touchstart', startDraw, { passive: false });
             canvas.addEventListener('touchmove', moveDraw, { passive: false });
             canvas.addEventListener('touchend', endDraw, { passive: false });
-            updateHint('▭ Drag to draw a rectangle around the logo');
+            updateHintWm('▭ Drag to draw a rectangle around the logo');
         }
 
-        // ---------- BRUSH MODE ----------
+        // ----- Brush Mode (unchanged) -----
         function setupBrushMode(canvas) {
             let isPainting = false;
             const brushSize = parseInt(brushSizeSlider.value) || 16;
@@ -2692,7 +2622,6 @@
                     }
                 }
                 wmMask = mask;
-                wmMaskDirty = true;
                 state.wm.brushPoints.push({ x: px, y: py });
                 drawMaskOverlay();
                 removeWmBtn.disabled = false;
@@ -2704,7 +2633,7 @@
                 isPainting = true;
                 const pos = getPos(e);
                 paintAt(pos.x, pos.y);
-                updateHint('✏️ Paint over the logo area');
+                updateHintWm('✏️ Paint over the logo area');
             };
 
             const movePaint = (e) => {
@@ -2719,7 +2648,7 @@
                 isPainting = false;
                 if (state.wm.brushPoints.length > 0) {
                     wmResultStatus.textContent = `✅ Logo painted (${state.wm.brushPoints.length} strokes)`;
-                    updateHint(`✅ ${state.wm.brushPoints.length} strokes applied`);
+                    updateHintWm(`✅ ${state.wm.brushPoints.length} strokes applied`);
                 } else { wmResultStatus.textContent = '—'; }
             };
 
@@ -2731,63 +2660,62 @@
             canvas.addEventListener('touchmove', movePaint, { passive: false });
             canvas.addEventListener('touchend', endPaint, { passive: false });
 
-            updateHint('✏️ Paint over the logo to mark it for removal');
+            updateHintWm('✏️ Paint over the logo to mark it for removal');
             brushSizeSlider.addEventListener('input', () => { brushSizeValue.textContent = brushSizeSlider.value; });
         }
 
-        // ---------- AUTO MODE ----------
+        // ----- Auto Mode (uses enhanced detection) -----
         function setupAutoMode(canvas) {
-            updateHint('🤖 AI is analyzing the image...');
+            updateHintWm('🤖 AI is analyzing the image...');
             if (state.wm.autoDetected && wmMask) {
                 drawMaskOverlay();
                 removeWmBtn.disabled = false;
                 const maskedCount = wmMask.reduce((a, b) => a + b, 0);
                 wmResultStatus.textContent =
                 `🤖 AI detected ${Math.round(maskedCount / (canvas.width * canvas.height) * 100)}% logo area`;
-                updateHint(`✅ AI detected logo area`);
+                updateHintWm(`✅ AI detected logo area`);
             } else {
-                runAutoDetectionFast(canvas);
+                runAutoDetectionEnhanced(canvas);
             }
-            canvas.addEventListener('click', (e) => { if (state.wm.mode === 'auto') runAutoDetectionFast(canvas); });
+            canvas.addEventListener('click', (e) => { if (state.wm.mode === 'auto') runAutoDetectionEnhanced(canvas); });
             canvas.addEventListener('touchstart', (e) => {
                 if (state.wm.mode === 'auto') { e.preventDefault();
-                    runAutoDetectionFast(canvas); }
+                    runAutoDetectionEnhanced(canvas); }
             }, { passive: false });
         }
 
-        function runAutoDetectionFast(canvas) {
-            showLoading(true, 'Detecting logos...', 10);
+        function runAutoDetectionEnhanced(canvas) {
+            showLoading(true, 'Detecting logos (enhanced AI)...', 10);
             setTimeout(() => {
                 const ctx = canvas.getContext('2d');
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const mask = detectLogosFast(imageData);
+                const mask = detectLogosEnhanced(imageData);
 
                 let maskedCount = 0;
                 for (let i = 0; i < mask.length; i++) { if (mask[i] > 0) maskedCount++; }
 
-                if (maskedCount < 50) {
-                    showError(errorMsgWm, 'No logo/watermark detected. Try manual selection.');
+                if (maskedCount < 30) {
+                    showError(errorMsgWm, 'No logo/watermark detected. Try manual selection (Rect/Brush).');
                     wmMask = new Uint8Array(canvas.width * canvas.height);
                     state.wm.autoDetected = false;
                     removeWmBtn.disabled = true;
                     showLoading(false);
-                    updateHint('🤖 No logo detected. Try a different mode.');
+                    updateHintWm('🤖 No logo detected. Try a different mode.');
                     return;
                 }
 
                 wmMask = mask;
                 state.wm.autoDetected = true;
-                wmMaskDirty = true;
                 removeWmBtn.disabled = false;
                 drawMaskOverlay();
                 const pct = Math.round(maskedCount / (canvas.width * canvas.height) * 100);
                 wmResultStatus.textContent = `🤖 AI detected ${pct}% logo area`;
-                updateHint(`✅ AI detected ${pct}% of the image as logo/watermark`);
+                updateHintWm(`✅ AI detected ${pct}% of the image as logo/watermark`);
                 showLoading(false, 'Detection complete', 100);
             }, 100);
         }
 
-        // ---------- MASK OVERLAY DRAWING ----------
+        // ----- Mask overlay (unchanged) -----
         function drawMaskOverlay() {
             if (!wmCanvas || !wmCtx || !wmMask) return;
             const canvas = wmCanvas,
@@ -2813,7 +2741,6 @@
                 }
                 ctx.putImageData(imageData, 0, 0);
 
-                // Draw boundary
                 const maskData = wmMask;
                 for (let y = 1; y < height - 1; y++) {
                     for (let x = 1; x < width - 1; x++) {
@@ -2835,14 +2762,12 @@
             img.src = canvas.dataset.originalData || state.wm.originalData.url;
         }
 
-        function updateHint(text) {
+        function updateHintWm(text) {
             const container = wmOriginalWrap.querySelector('.selection-hint');
             if (container) container.textContent = text;
         }
 
-        // ================================================================
-        // PERFORM WM REMOVAL (Optimized)
-        // ================================================================
+        // ----- Perform removal (uses improved inpainting) -----
         function performWmRemoval() {
             if (!state.wm.originalData) { showError(errorMsgWm, 'Please upload an image first.'); return; }
             if (!wmMask || wmMask.length === 0) { showError(errorMsgWm,
@@ -2852,27 +2777,23 @@
             for (let i = 0; i < wmMask.length; i++) { if (wmMask[i] > 0) maskedCount++; }
             if (maskedCount < 5) { showError(errorMsgWm, 'No logo/watermark area selected. Please mark the area first.'); return; }
 
-            showLoading(true, 'Inpainting logo area...', 5);
+            showLoading(true, 'Inpainting logo area (AI)...', 5);
 
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
 
-            // Use the processed dimensions (which may be resized)
             const procW = state.wm.processedWidth || wmCanvas.width;
             const procH = state.wm.processedHeight || wmCanvas.height;
             canvas.width = procW;
             canvas.height = procH;
 
-            // Draw the original image at the processed size
             const img = new Image();
             img.onload = () => {
                 ctx.drawImage(img, 0, 0, procW, procH);
                 const imageData = ctx.getImageData(0, 0, procW, procH);
 
-                // Scale the mask if needed
                 let maskToUse = wmMask;
                 if (wmMask.length !== procW * procH) {
-                    // Resize mask to match processed dimensions
                     const scaledMask = new Uint8Array(procW * procH);
                     const scaleX = wmCanvas.width / procW;
                     const scaleY = wmCanvas.height / procH;
@@ -2905,7 +2826,6 @@
                 const resultImageData = new ImageData(resultData, procW, procH);
                 ctx.putImageData(resultImageData, 0, 0);
 
-                // If we need to scale back to original size
                 let finalCanvas = canvas;
                 if (state.wm.originalWidth !== procW || state.wm.originalHeight !== procH) {
                     const fullCanvas = document.createElement('canvas');
@@ -2966,7 +2886,6 @@
             wmRect = null;
             wmBrushPoints = [];
             wmMask = null;
-            wmMaskDirty = false;
             wmCanvas = null;
             wmCtx = null;
             wmImageData = null;
@@ -2986,10 +2905,7 @@
             showLoading(false);
         }
 
-        // ================================================================
-        // WM EVENT BINDINGS
-        // ================================================================
-
+        // ----- WM Event bindings (unchanged) -----
         fileInputWm.addEventListener('change', (e) => {
             if (e.target.files.length > 0) handleWmFile(e.target.files[0]);
         });
@@ -3013,7 +2929,6 @@
                 brushSizeGroup.style.display = mode === 'brush' ? 'flex' : 'none';
 
                 wmMask = new Uint8Array(wmCanvas ? wmCanvas.width * wmCanvas.height : 0);
-                wmMaskDirty = false;
                 state.wm.autoDetected = false;
                 state.wm.brushPoints = [];
                 state.wm.selection = null;
@@ -3033,11 +2948,11 @@
                         wmOriginalImageData = new Uint8ClampedArray(wmImageData.data);
                         wmCanvas.dataset.originalData = img.src;
                         if (mode === 'rectangle') { setupRectMode(wmCanvas);
-                            updateHint('▭ Drag to draw a rectangle around the logo'); } else if (mode ===
+                            updateHintWm('▭ Drag to draw a rectangle around the logo'); } else if (mode ===
                             'brush') { setupBrushMode(wmCanvas);
-                            updateHint('✏️ Paint over the logo to mark it'); } else if (mode === 'auto') {
+                            updateHintWm('✏️ Paint over the logo to mark it'); } else if (mode === 'auto') {
                             setupAutoMode(wmCanvas);
-                            setTimeout(() => runAutoDetectionFast(wmCanvas), 200); }
+                            setTimeout(() => runAutoDetectionEnhanced(wmCanvas), 200); }
                     };
                     img.src = wmCanvas.dataset.originalData || state.wm.originalData.url;
                 }
@@ -3085,7 +3000,6 @@
             removeWmBtn.disabled = true;
             downloadWmBtn.disabled = true;
 
-            toleranceValue.textContent = toleranceSlider.value;
             patchSizeValue.textContent = patchSizeSlider.value;
             brushSizeValue.textContent = brushSizeSlider.value;
             brushSizeGroup.style.display = 'none';
@@ -3093,6 +3007,5 @@
             window.addEventListener('resize', () => {});
         });
     </script>
-
 </body>
 </html>
