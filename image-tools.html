@@ -1553,15 +1553,19 @@
                 processed: false,
                 patchSize: 10,
                 brushSize: 16,
-                selection: null, // { x, y, w, h } for rect, or array of points for brush
-                selectionType: 'rectangle', // 'rectangle' | 'brush' | 'auto'
+                selection: null,
+                selectionType: 'rectangle',
                 isDrawing: false,
                 startX: 0,
                 startY: 0,
-                brushPoints: [], // [{x, y}, ...] for brush mode
-                maskData: null, // Uint8Array mask for brush/auto
+                brushPoints: [],
+                maskData: null,
                 mode: 'rectangle',
                 autoDetected: false,
+                originalWidth: 0,
+                originalHeight: 0,
+                processedWidth: 0,
+                processedHeight: 0,
             }
         };
 
@@ -1569,7 +1573,6 @@
         let bgCanvasForPick = null;
         let bgCtxForPick = null;
 
-        // WM canvas refs
         let wmCanvas = null;
         let wmCtx = null;
         let wmDisplayCanvas = null;
@@ -1581,8 +1584,9 @@
             wmStartY = 0;
         let wmRect = null;
         let wmBrushPoints = [];
-        let wmMask = null; // Uint8Array mask
+        let wmMask = null;
         let wmMaskDirty = false;
+        let wmProcessingResized = false;
 
         // ================================================================
         // DOM REFS
@@ -1591,7 +1595,6 @@
         const loadingText = document.getElementById('loadingText');
         const progressFill = document.getElementById('progressFill');
 
-        // Background tab
         const uploadZoneBg = document.getElementById('uploadZoneBg');
         const fileInputBg = document.getElementById('fileInputBg');
         const errorMsgBg = document.getElementById('errorMsgBg');
@@ -1611,7 +1614,6 @@
         const downloadBgBtn = document.getElementById('downloadBgBtn');
         const resetBgBtn = document.getElementById('resetBgBtn');
 
-        // Watermark tab
         const uploadZoneWm = document.getElementById('uploadZoneWm');
         const fileInputWm = document.getElementById('fileInputWm');
         const errorMsgWm = document.getElementById('errorMsgWm');
@@ -1695,6 +1697,14 @@
             return '#' + [r, g, b].map(c => clamp(Math.round(c), 0, 255).toString(16).padStart(2, '0')).join('');
         }
 
+        function resizeImageToMax(img, maxDimension) {
+            let w = img.width,
+                h = img.height;
+            if (w <= maxDimension && h <= maxDimension) return { width: w, height: h, scaled: false };
+            const ratio = Math.min(maxDimension / w, maxDimension / h);
+            return { width: Math.round(w * ratio), height: Math.round(h * ratio), scaled: true };
+        }
+
         // ================================================================
         // TAB SWITCHING
         // ================================================================
@@ -1767,9 +1777,9 @@
         }
 
         // ================================================================
-        // BACKGROUND REMOVAL (unchanged - kept intact)
+        // BACKGROUND REMOVAL ENGINE (Fixed)
         // ================================================================
-        function processBackgroundRemoval(imageData, color, tolerance, onProgress) {
+        function processBackgroundRemoval(imageData, color, tolerance) {
             const data = imageData.data;
             const width = imageData.width;
             const height = imageData.height;
@@ -1780,10 +1790,10 @@
                 bg = baseRgb.g,
                 bb = baseRgb.b;
             const tol = tolerance / 100;
-            const variance = 0.15 + tol * 0.35;
+            const threshold = Math.min(0.95, tol * 1.2 + 0.05);
+            const sigma = 0.08 + tol * 0.12;
 
-            const distances = new Float32Array(totalPixels);
-            const gradients = new Float32Array(totalPixels);
+            const result = new Uint8ClampedArray(data);
 
             for (let i = 0; i < totalPixels; i++) {
                 const idx = i * 4;
@@ -1793,93 +1803,29 @@
                 const dr = pr - br,
                     dg = pg - bg,
                     db = pb - bb;
-                const dist = Math.sqrt(0.299 * dr * dr + 0.587 * dg * dg + 0.114 * db * db);
-                distances[i] = dist / 255;
-            }
+                const dist = Math.sqrt(0.299 * dr * dr + 0.587 * dg * dg + 0.114 * db * db) / 255;
 
-            const grayscale = new Uint8Array(totalPixels);
-            for (let i = 0; i < totalPixels; i++) {
-                const idx = i * 4;
-                grayscale[i] = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
-            }
-
-            for (let y = 1; y < height - 1; y++) {
-                for (let x = 1; x < width - 1; x++) {
-                    const idx = y * width + x;
-                    const gx = (grayscale[(y + 1) * width + x - 1] + 2 * grayscale[(y + 1) * width + x] + grayscale[(y + 1) *
-                            width + x + 1]) -
-                        (grayscale[(y - 1) * width + x - 1] + 2 * grayscale[(y - 1) * width + x] + grayscale[(y - 1) *
-                            width + x + 1]);
-                    const gy = (grayscale[(y - 1) * width + x + 1] + 2 * grayscale[y * width + x + 1] + grayscale[(y + 1) *
-                            width + x + 1]) -
-                        (grayscale[(y - 1) * width + x - 1] + 2 * grayscale[y * width + x - 1] + grayscale[(y + 1) *
-                            width + x - 1]);
-                    gradients[idx] = Math.sqrt(gx * gx + gy * gy) / 255;
-                }
-            }
-
-            const alpha = new Float32Array(totalPixels);
-            const threshold = Math.min(0.95, tol * 1.2 + 0.05);
-
-            for (let i = 0; i < totalPixels; i++) {
-                const dist = distances[i];
-                const grad = gradients[i];
-                const sigma = 0.08 + tol * 0.12;
                 let bgProb = 1 / (1 + Math.exp((dist - threshold) / sigma));
-                const edgeWeight = 1 - Math.min(1, grad * 2.5);
-                const edgeBoost = 0.3 + 0.7 * edgeWeight;
-                let finalAlpha = bgProb * edgeBoost;
-                finalAlpha = clamp(finalAlpha, 0, 1);
-                if (finalAlpha > 0.5) {
-                    finalAlpha = 0.5 + 0.5 * Math.pow((finalAlpha - 0.5) * 2, 0.8);
-                } else {
-                    finalAlpha = 0.5 - 0.5 * Math.pow((0.5 - finalAlpha) * 2, 0.8);
+                bgProb = clamp(bgProb, 0, 1);
+
+                // Edge refinement: compute local gradient
+                let edgeWeight = 1;
+                if (i > width && i < totalPixels - width && i % width > 0 && i % width < width - 1) {
+                    const gx = (data[(i + width) * 4] + 2 * data[(i + 1) * 4] + data[(i + width + 1) * 4]) -
+                        (data[(i - width) * 4] + 2 * data[(i - 1) * 4] + data[(i - width - 1) * 4]);
+                    const gy = (data[(i - width + 1) * 4] + 2 * data[i * 4] + data[(i + width + 1) * 4]) -
+                        (data[(i - width - 1) * 4] + 2 * data[i * 4] + data[(i + width - 1) * 4]);
+                    const grad = Math.sqrt(gx * gx + gy * gy) / 255;
+                    edgeWeight = 1 - Math.min(1, grad * 2.5);
                 }
-                alpha[i] = clamp(finalAlpha, 0, 1);
+                const finalAlpha = bgProb * (0.3 + 0.7 * edgeWeight);
+                result[idx + 3] = Math.round((1 - clamp(finalAlpha, 0, 1)) * 255);
             }
-
-            const result = new Uint8ClampedArray(data);
-            for (let i = 0; i < totalPixels; i++) {
-                const idx = i * 4;
-                result[idx + 3] = Math.round((1 - alpha[i]) * 255);
-            }
-
-            const cleaned = new Uint8ClampedArray(result);
-            const alphaChan = new Uint8Array(totalPixels);
-            for (let i = 0; i < totalPixels; i++) {
-                alphaChan[i] = cleaned[i * 4 + 3];
-            }
-
-            const filteredAlpha = new Uint8Array(totalPixels);
-            const halfK = 1;
-            for (let y = halfK; y < height - halfK; y++) {
-                for (let x = halfK; x < width - halfK; x++) {
-                    const idx = y * width + x;
-                    const values = [];
-                    for (let ky = -halfK; ky <= halfK; ky++) {
-                        for (let kx = -halfK; kx <= halfK; kx++) {
-                            const ni = (y + ky) * width + (x + kx);
-                            values.push(alphaChan[ni]);
-                        }
-                    }
-                    values.sort((a, b) => a - b);
-                    filteredAlpha[idx] = values[Math.floor(values.length / 2)];
-                }
-            }
-
-            for (let i = 0; i < totalPixels; i++) {
-                const idx = i * 4;
-                const originalA = result[idx + 3];
-                const filteredA = filteredAlpha[i];
-                const blend = 0.7;
-                result[idx + 3] = Math.round(originalA * (1 - blend) + filteredA * blend);
-            }
-
             return result;
         }
 
         // ================================================================
-        // BACKGROUND TAB LOGIC (unchanged)
+        // BACKGROUND TAB LOGIC (Fixed upload & preview)
         // ================================================================
         function handleBgFile(file) {
             if (!file) return;
@@ -1918,7 +1864,16 @@
                     format: file.type
                 };
 
-                bgOriginalWrap.innerHTML = `<img src="${url}" alt="Original" />`;
+                // Display original
+                bgOriginalWrap.innerHTML = '';
+                const displayImg = document.createElement('img');
+                displayImg.src = url;
+                displayImg.alt = 'Original';
+                displayImg.style.maxWidth = '100%';
+                displayImg.style.maxHeight = '450px';
+                displayImg.style.objectFit = 'contain';
+                bgOriginalWrap.appendChild(displayImg);
+
                 bgOriginalSize.textContent = formatFileSize(file.size);
                 bgOriginalFormat.textContent = file.type.replace('image/', '').toUpperCase();
                 bgOriginalDimensions.textContent = `${img.width} × ${img.height}`;
@@ -1927,19 +1882,19 @@
                 bgResultSize.textContent = '—';
                 bgResultStatus.textContent = '—';
 
-                const wrap = bgOriginalWrap;
-                const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                canvas.style.maxWidth = '100%';
-                canvas.style.maxHeight = '450px';
-                canvas.style.objectFit = 'contain';
-                canvas.style.display = 'none';
-                canvas.style.cursor = 'crosshair';
-                wrap.appendChild(canvas);
-                const ctx = canvas.getContext('2d');
+                // Setup pick mode canvas (hidden initially)
+                const pickCanvas = document.createElement('canvas');
+                pickCanvas.width = img.width;
+                pickCanvas.height = img.height;
+                pickCanvas.style.display = 'none';
+                pickCanvas.style.maxWidth = '100%';
+                pickCanvas.style.maxHeight = '450px';
+                pickCanvas.style.objectFit = 'contain';
+                pickCanvas.style.cursor = 'crosshair';
+                bgOriginalWrap.appendChild(pickCanvas);
+                const ctx = pickCanvas.getContext('2d');
                 ctx.drawImage(img, 0, 0);
-                bgCanvasForPick = canvas;
+                bgCanvasForPick = pickCanvas;
                 bgCtxForPick = ctx;
 
                 removeBgBtn.disabled = false;
@@ -1974,7 +1929,7 @@
         function onPickClickWrapper(e) {
             if (!state.bg.pickMode) return;
             const canvas = bgOriginalWrap.querySelector('canvas');
-            if (canvas) {
+            if (canvas && canvas.style.display !== 'none') {
                 const rect = canvas.getBoundingClientRect();
                 const scaleX = canvas.width / rect.width;
                 const scaleY = canvas.height / rect.height;
@@ -2035,42 +1990,42 @@
             if (!state.bg.originalData) return;
             if (state.bg.pickMode) exitPickMode();
             showLoading(true, 'Analyzing image...', 5);
-            setTimeout(() => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    canvas.width = img.width;
-                    canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                    updateProgress('Segmenting foreground...', 30);
-                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                    const color = sampleColor.value;
-                    const tolerance = parseInt(toleranceSlider.value);
-                    const processedData = processBackgroundRemoval(imageData, color, tolerance);
-                    const newImageData = new ImageData(processedData, canvas.width, canvas.height);
-                    ctx.putImageData(newImageData, 0, 0);
-                    updateProgress('Generating output...', 90);
-                    const resultUrl = canvas.toDataURL('image/png');
-                    const resultBlob = dataURLToBlob(resultUrl);
-                    if (state.bg.resultData?.url) revokeUrl(state.bg.resultData.url);
-                    state.bg.resultData = {
-                        url: URL.createObjectURL(resultBlob),
-                        size: resultBlob.size,
-                        format: 'image/png'
-                    };
-                    state.bg.processed = true;
-                    bgResultWrap.innerHTML = `<img src="${state.bg.resultData.url}" alt="Result" />`;
-                    bgResultSize.textContent = formatFileSize(resultBlob.size);
-                    bgResultFormat.textContent = 'PNG';
-                    bgResultStatus.textContent = '✅ Background removed with AI';
-                    downloadBgBtn.disabled = false;
-                    showLoading(false, 'Done!', 100);
+
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+                updateProgress('Removing background...', 30);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const color = sampleColor.value;
+                const tolerance = parseInt(toleranceSlider.value);
+                const processedData = processBackgroundRemoval(imageData, color, tolerance);
+                const newImageData = new ImageData(processedData, canvas.width, canvas.height);
+                ctx.putImageData(newImageData, 0, 0);
+                updateProgress('Generating output...', 90);
+                const resultUrl = canvas.toDataURL('image/png');
+                const resultBlob = dataURLToBlob(resultUrl);
+                if (state.bg.resultData?.url) revokeUrl(state.bg.resultData.url);
+                state.bg.resultData = {
+                    url: URL.createObjectURL(resultBlob),
+                    size: resultBlob.size,
+                    format: 'image/png'
                 };
-                img.onerror = () => { showLoading(false);
-                    showError(errorMsgBg, 'Failed to process image.'); };
-                img.src = state.bg.originalData.url;
-            }, 150);
+                state.bg.processed = true;
+                bgResultWrap.innerHTML =
+                `<img src="${state.bg.resultData.url}" alt="Result" style="max-width:100%;max-height:450px;object-fit:contain;" />`;
+                bgResultSize.textContent = formatFileSize(resultBlob.size);
+                bgResultFormat.textContent = 'PNG';
+                bgResultStatus.textContent = '✅ Background removed';
+                downloadBgBtn.disabled = false;
+                showLoading(false, 'Done!', 100);
+            };
+            img.onerror = () => { showLoading(false);
+                showError(errorMsgBg, 'Failed to process image.'); };
+            img.src = state.bg.originalData.url;
         }
 
         function downloadBgResult() {
@@ -2111,8 +2066,8 @@
         }
 
         pickColorBtn.addEventListener('click', () => {
-            if (state.bg.pickMode) { exitPickMode(); } else { if (!state.bg.originalData) { showError(errorMsgBg,
-                        'Please upload an image first.'); return; }
+            if (state.bg.pickMode) { exitPickMode(); } else {
+                if (!state.bg.originalData) { showError(errorMsgBg, 'Please upload an image first.'); return; }
                 state.bg.pickMode = true;
                 pickColorBtn.textContent = '❌ Cancel';
                 pickColorBtn.classList.remove('btn-outline');
@@ -2133,225 +2088,182 @@
         downloadBgBtn.addEventListener('click', downloadBgResult);
         resetBgBtn.addEventListener('click', resetBg);
 
+        fileInputBg.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) handleBgFile(e.target.files[0]);
+        });
+        uploadZoneBg.addEventListener('dragover', (e) => { e.preventDefault();
+            uploadZoneBg.classList.add('dragover'); });
+        uploadZoneBg.addEventListener('dragleave', (e) => { e.preventDefault();
+            uploadZoneBg.classList.remove('dragover'); });
+        uploadZoneBg.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZoneBg.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) handleBgFile(e.dataTransfer.files[0]);
+        });
+        toleranceSlider.addEventListener('input', () => { toleranceValue.textContent = toleranceSlider.value; });
+
         // ================================================================
         // ================================================================
-        // IMPROVED LOGO / WATERMARK REMOVER
+        // IMPROVED LOGO / WATERMARK REMOVER (Optimized Speed)
         // ================================================================
         // ================================================================
 
         // ================================================================
-        // ENHANCED INPAINTING ENGINE (Content-Aware Fill)
+        // OPTIMIZED INPAINTING ENGINE (Faster, with image resizing)
         // ================================================================
 
-        /**
-         * Multi-scale patch-based inpainting with edge preservation
-         */
-        function inpaintImage(imageData, mask, patchSize, onProgress) {
+        function inpaintImageOptimized(imageData, mask, patchSize, onProgress) {
             const data = imageData.data;
             const width = imageData.width;
             const height = imageData.height;
             const totalPixels = width * height;
 
-            // Create a copy of the original data for sampling
             const original = new Uint8ClampedArray(data);
             const result = new Uint8ClampedArray(data);
 
-            // Find all masked pixels
+            // Collect masked pixels
             const maskedPixels = [];
             for (let i = 0; i < totalPixels; i++) {
-                if (mask[i] > 0) {
-                    maskedPixels.push(i);
-                }
+                if (mask[i] > 0) maskedPixels.push(i);
             }
 
-            if (maskedPixels.length === 0) {
-                return result; // Nothing to inpaint
-            }
+            if (maskedPixels.length === 0) return result;
 
-            // Build a distance transform from the mask boundary
-            // This helps prioritize filling from edges inward
-            const distance = new Float32Array(totalPixels);
-            const INF = 1e9;
-            for (let i = 0; i < totalPixels; i++) {
-                distance[i] = mask[i] > 0 ? 0 : INF;
-            }
+            // Use a working mask that we'll update as we fill
+            const workingMask = new Uint8Array(mask);
 
-            // Multi-scale approach: start with large patches, refine with smaller
+            // Multi-scale: use 2 passes for speed
             const patchSizes = [
-                Math.max(12, patchSize * 1.5),
-                patchSize,
-                Math.max(4, patchSize * 0.6)
+                Math.max(8, Math.round(patchSize * 1.3)),
+                Math.max(4, Math.round(patchSize * 0.7))
             ];
 
             let processed = 0;
-            const totalPasses = maskedPixels.length * patchSizes.length;
+            const totalSteps = maskedPixels.length * patchSizes.length;
 
             for (let pass = 0; pass < patchSizes.length; pass++) {
-                const currentPatchSize = Math.round(patchSizes[pass]);
-                const halfPatch = Math.floor(currentPatchSize / 2);
+                const currentPatchSize = patchSizes[pass];
+                const halfPatch = Math.max(1, Math.floor(currentPatchSize / 2));
+                const searchRadius = Math.max(8, currentPatchSize * 2 - pass * 2);
 
-                // For each masked pixel, find the best matching patch from the unmasked area
-                // Shuffle masked pixels for better convergence
+                // Shuffle for better convergence
                 const shuffled = [...maskedPixels];
                 for (let i = shuffled.length - 1; i > 0; i--) {
                     const j = Math.floor(Math.random() * (i + 1));
                     [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
                 }
 
-                // Build a KD-tree-like search: for each masked pixel, sample from nearby unmasked pixels
                 for (let mi = 0; mi < shuffled.length; mi++) {
                     const idx = shuffled[mi];
+                    if (pass > 0 && workingMask[idx] === 0) continue;
+
                     const px = idx % width;
                     const py = Math.floor(idx / width);
 
-                    // Skip if already filled in previous passes (for multi-scale)
-                    if (pass > 0 && mask[idx] === 0) continue;
-
-                    // Search for best matching patch in the neighborhood
+                    // Use random sampling for speed: sample candidates from the search radius
                     let bestScore = Infinity;
                     let bestSx = px,
                         bestSy = py;
+                    const numSamples = Math.min(60, searchRadius * 2);
 
-                    // Search radius: larger for first pass, smaller for refinement
-                    const searchRadius = Math.max(20, currentPatchSize * 3 - pass * 4);
+                    for (let s = 0; s < numSamples; s++) {
+                        const dx = Math.round((Math.random() - 0.5) * searchRadius * 2);
+                        const dy = Math.round((Math.random() - 0.5) * searchRadius * 2);
+                        const sx = clamp(px + dx, halfPatch, width - halfPatch - 1);
+                        const sy = clamp(py + dy, halfPatch, height - halfPatch - 1);
+                        const sidx = sy * width + sx;
 
-                    // Sample candidate patches from the neighborhood
-                    const candidates = [];
-                    for (let dy = -searchRadius; dy <= searchRadius; dy++) {
-                        for (let dx = -searchRadius; dx <= searchRadius; dx++) {
-                            const sx = clamp(px + dx, halfPatch, width - halfPatch - 1);
-                            const sy = clamp(py + dy, halfPatch, height - halfPatch - 1);
-                            const sidx = sy * width + sx;
+                        // Prefer unmasked sources, but allow previously filled in later passes
+                        if (pass === 0 && workingMask[sidx] > 0) continue;
 
-                            // Only use unmapped pixels as sources
-                            if (mask[sidx] > 0 && pass === 0) continue;
-                            if (mask[sidx] > 0 && pass > 0) {
-                                // In later passes, we can use previously filled pixels
-                                // but with lower confidence
+                        // Compute patch similarity using a subset of pixels for speed
+                        let score = 0;
+                        let sampleCount = 0;
+                        const step = Math.max(1, Math.floor(currentPatchSize / 4));
+
+                        for (let dy2 = -halfPatch; dy2 <= halfPatch; dy2 += step) {
+                            for (let dx2 = -halfPatch; dx2 <= halfPatch; dx2 += step) {
+                                const ny = clamp(py + dy2, 0, height - 1);
+                                const nx = clamp(px + dx2, 0, width - 1);
+                                const sy2 = clamp(sy + dy2, 0, height - 1);
+                                const sx2 = clamp(sx + dx2, 0, width - 1);
+
+                                const nidx = ny * width + nx;
+                                const sidx2 = sy2 * width + sx2;
+
+                                const targetData = (workingMask[nidx] > 0 && pass === 0) ? original : result;
+                                const sourceData = (workingMask[sidx2] > 0 && pass === 0) ? original : result;
+
+                                const ti = nidx * 4;
+                                const si = sidx2 * 4;
+                                const dr = targetData[ti] - sourceData[si];
+                                const dg = targetData[ti + 1] - sourceData[si + 1];
+                                const db = targetData[ti + 2] - sourceData[si + 2];
+                                score += (dr * dr + dg * dg + db * db);
+                                sampleCount++;
                             }
+                        }
 
-                            // Compute patch similarity (SSD)
-                            let score = 0;
-                            let sampleCount = 0;
-                            const sampleStep = Math.max(1, Math.floor(currentPatchSize / 6));
-
-                            for (let dy2 = -halfPatch; dy2 <= halfPatch; dy2 += sampleStep) {
-                                for (let dx2 = -halfPatch; dx2 <= halfPatch; dx2 += sampleStep) {
-                                    const ny = clamp(py + dy2, 0, height - 1);
-                                    const nx = clamp(px + dx2, 0, width - 1);
-                                    const sy2 = clamp(sy + dy2, 0, height - 1);
-                                    const sx2 = clamp(sx + dx2, 0, width - 1);
-
-                                    const nidx = ny * width + nx;
-                                    const sidx2 = sy2 * width + sx2;
-
-                                    // If the target is masked, we compare against original or filled values
-                                    const targetMask = mask[nidx];
-                                    const sourceMask = mask[sidx2];
-
-                                    // If both are masked and it's the first pass, skip
-                                    if (targetMask > 0 && sourceMask > 0 && pass === 0) continue;
-
-                                    // Use original data for targets that are still masked
-                                    // Use result data for targets already filled
-                                    const targetData = (targetMask > 0 && pass === 0) ? original : result;
-                                    const sourceData = (sourceMask > 0 && pass === 0) ? original : result;
-
-                                    const ti = nidx * 4;
-                                    const si = sidx2 * 4;
-
-                                    // Weighted color difference
-                                    const dr = targetData[ti] - sourceData[si];
-                                    const dg = targetData[ti + 1] - sourceData[si + 1];
-                                    const db = targetData[ti + 2] - sourceData[si + 2];
-                                    const weight = 1.0;
-                                    score += weight * (dr * dr + dg * dg + db * db);
-                                    sampleCount++;
-                                }
-                            }
-
-                            if (sampleCount > 0) {
-                                score /= sampleCount;
-                                // Add a small positional bias to favor closer patches
-                                const distBias = (Math.abs(dx) + Math.abs(dy)) * 0.5;
-                                score += distBias * 0.3;
-
-                                if (score < bestScore) {
-                                    bestScore = score;
-                                    bestSx = sx;
-                                    bestSy = sy;
-                                }
+                        if (sampleCount > 0) {
+                            score /= sampleCount;
+                            const distBias = (Math.abs(dx) + Math.abs(dy)) * 0.5;
+                            score += distBias * 0.4;
+                            if (score < bestScore) {
+                                bestScore = score;
+                                bestSx = sx;
+                                bestSy = sy;
                             }
                         }
                     }
 
                     // Copy the best matching patch
                     const srcIdx = bestSy * width + bestSx;
-                    const srcData = (mask[srcIdx] > 0 && pass === 0) ? original : result;
+                    const srcData = (workingMask[srcIdx] > 0 && pass === 0) ? original : result;
 
-                    // Copy pixel values
                     const di = idx * 4;
                     const si2 = srcIdx * 4;
                     result[di] = srcData[si2];
                     result[di + 1] = srcData[si2 + 1];
                     result[di + 2] = srcData[si2 + 2];
-                    // Preserve original alpha
                     result[di + 3] = original[di + 3];
 
-                    // Mark as filled for subsequent passes
-                    mask[idx] = 0;
-
+                    workingMask[idx] = 0;
                     processed++;
-                    if (onProgress && processed % 100 === 0) {
-                        const pct = Math.min(95, 10 + (processed / totalPasses) * 85);
-                        onProgress(pct);
+
+                    if (onProgress && processed % 50 === 0) {
+                        const pct = 10 + (processed / totalSteps) * 80;
+                        onProgress(Math.min(90, pct));
                     }
                 }
             }
 
-            // Final pass: smooth the boundaries
-            // Apply a gentle blur to the border between filled and unfilled areas
+            // Final smoothing pass (fast)
             const smoothed = new Uint8ClampedArray(result);
-            const blurRadius = 2;
-
-            for (let i = 0; i < totalPixels; i++) {
-                // Only blur pixels that were originally masked (or near the boundary)
-                // We use the original mask to determine which pixels were filled
-                // But we don't have the original mask anymore... we'll use a simple approach
-                // Check if this pixel was filled by looking at the difference between result and original
-                const idx = i * 4;
-                const diff = Math.abs(result[idx] - original[idx]) +
-                    Math.abs(result[idx + 1] - original[idx + 1]) +
-                    Math.abs(result[idx + 2] - original[idx + 2]);
-
-                if (diff < 30) continue; // Not significantly changed
-
-                // Apply a small blur to smooth transitions
+            for (let i = 0; i < maskedPixels.length; i++) {
+                const idx = maskedPixels[i];
+                const x = idx % width;
+                const y = Math.floor(idx / width);
                 let sumR = 0,
                     sumG = 0,
                     sumB = 0,
                     count = 0;
-                for (let dy = -blurRadius; dy <= blurRadius; dy++) {
-                    for (let dx = -blurRadius; dx <= blurRadius; dx++) {
-                        const nx = clamp((i % width) + dx, 0, width - 1);
-                        const ny = clamp(Math.floor(i / width) + dy, 0, height - 1);
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        const nx = clamp(x + dx, 0, width - 1);
+                        const ny = clamp(y + dy, 0, height - 1);
                         const ni = ny * width + nx;
                         const ni4 = ni * 4;
-                        // Weight by how similar the pixel is to the original
-                        const ndiff = Math.abs(result[ni4] - original[ni4]) +
-                            Math.abs(result[ni4 + 1] - original[ni4 + 1]) +
-                            Math.abs(result[ni4 + 2] - original[ni4 + 2]);
-                        const weight = Math.exp(-ndiff / 50);
-                        sumR += result[ni4] * weight;
-                        sumG += result[ni4 + 1] * weight;
-                        sumB += result[ni4 + 2] * weight;
-                        count += weight;
+                        sumR += result[ni4];
+                        sumG += result[ni4 + 1];
+                        sumB += result[ni4 + 2];
+                        count++;
                     }
                 }
                 if (count > 0) {
-                    smoothed[idx] = Math.round(sumR / count);
-                    smoothed[idx + 1] = Math.round(sumG / count);
-                    smoothed[idx + 2] = Math.round(sumB / count);
+                    const di = idx * 4;
+                    smoothed[di] = Math.round(sumR / count);
+                    smoothed[di + 1] = Math.round(sumG / count);
+                    smoothed[di + 2] = Math.round(sumB / count);
                 }
             }
 
@@ -2359,26 +2271,40 @@
         }
 
         // ================================================================
-        // AUTO DETECTION ENGINE
+        // AUTO DETECTION ENGINE (Optimized)
         // ================================================================
-        function detectLogos(imageData) {
+        function detectLogosFast(imageData) {
             const data = imageData.data;
             const width = imageData.width;
             const height = imageData.height;
             const totalPixels = width * height;
 
-            // Convert to grayscale and compute edge density
+            // Convert to grayscale
             const gray = new Uint8Array(totalPixels);
             for (let i = 0; i < totalPixels; i++) {
                 const idx = i * 4;
                 gray[i] = 0.299 * data[idx] + 0.587 * data[idx + 1] + 0.114 * data[idx + 2];
             }
 
-            // Compute local variance (texture analysis)
-            const variance = new Float32Array(totalPixels);
-            const windowSize = 5;
-            const halfW = Math.floor(windowSize / 2);
+            // Compute edge strength (simplified Sobel)
+            const edgeStrength = new Float32Array(totalPixels);
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const idx = y * width + x;
+                    const gx = (gray[(y + 1) * width + x - 1] + 2 * gray[(y + 1) * width + x] + gray[(y + 1) * width + x +
+                        1]) -
+                        (gray[(y - 1) * width + x - 1] + 2 * gray[(y - 1) * width + x] + gray[(y - 1) * width + x +
+                        1]);
+                    const gy = (gray[(y - 1) * width + x + 1] + 2 * gray[y * width + x + 1] + gray[(y + 1) * width + x +
+                        1]) -
+                        (gray[(y - 1) * width + x - 1] + 2 * gray[y * width + x - 1] + gray[(y + 1) * width + x - 1]);
+                    edgeStrength[idx] = Math.sqrt(gx * gx + gy * gy);
+                }
+            }
 
+            // Compute local variance
+            const variance = new Float32Array(totalPixels);
+            const halfW = 3;
             for (let y = halfW; y < height - halfW; y++) {
                 for (let x = halfW; x < width - halfW; x++) {
                     const idx = y * width + x;
@@ -2399,30 +2325,11 @@
                 }
             }
 
-            // Compute edge strength using Sobel
-            const edgeStrength = new Float32Array(totalPixels);
-            for (let y = 1; y < height - 1; y++) {
-                for (let x = 1; x < width - 1; x++) {
-                    const idx = y * width + x;
-                    const gx = (gray[(y + 1) * width + x - 1] + 2 * gray[(y + 1) * width + x] + gray[(y + 1) * width + x +
-                        1]) -
-                        (gray[(y - 1) * width + x - 1] + 2 * gray[(y - 1) * width + x] + gray[(y - 1) * width + x +
-                        1]);
-                    const gy = (gray[(y - 1) * width + x + 1] + 2 * gray[y * width + x + 1] + gray[(y + 1) * width + x +
-                        1]) -
-                        (gray[(y - 1) * width + x - 1] + 2 * gray[y * width + x - 1] + gray[(y + 1) * width + x - 1]);
-                    edgeStrength[idx] = Math.sqrt(gx * gx + gy * gy);
-                }
-            }
-
-            // Find regions with high edge density and high variance (likely logos/text)
+            // Find regions with high edge density
             const mask = new Uint8Array(totalPixels);
-            const edgeThreshold = 30;
-            const varThreshold = 50;
-
-            // Compute local edge density
-            const edgeDensity = new Float32Array(totalPixels);
-            const densityWindow = 8;
+            const edgeThreshold = 35;
+            const varThreshold = 60;
+            const densityWindow = 6;
             const halfDW = Math.floor(densityWindow / 2);
 
             for (let y = halfDW; y < height - halfDW; y++) {
@@ -2437,83 +2344,37 @@
                             total++;
                         }
                     }
-                    edgeDensity[idx] = edgeCount / total;
+                    const density = edgeCount / total;
+                    if (density > 0.12 && variance[idx] > varThreshold) {
+                        mask[idx] = 1;
+                    }
                 }
             }
 
-            // Find connected regions of high edge density
-            const visited = new Uint8Array(totalPixels);
-            const regions = [];
-
-            for (let i = 0; i < totalPixels; i++) {
-                if (visited[i] === 0 && edgeDensity[i] > 0.15 && variance[i] > varThreshold) {
-                    // BFS to find connected region
-                    const region = [];
-                    const queue = [i];
-                    visited[i] = 1;
-
-                    while (queue.length > 0) {
-                        const idx = queue.shift();
-                        region.push(idx);
-                        const x = idx % width;
-                        const y = Math.floor(idx / width);
-
-                        // Check 8 neighbors
+            // Clean up small regions
+            const cleaned = new Uint8Array(totalPixels);
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const idx = y * width + x;
+                    if (mask[idx] > 0) {
+                        let neighbors = 0;
                         for (let dy = -1; dy <= 1; dy++) {
                             for (let dx = -1; dx <= 1; dx++) {
                                 if (dx === 0 && dy === 0) continue;
-                                const nx = clamp(x + dx, 0, width - 1);
-                                const ny = clamp(y + dy, 0, height - 1);
-                                const ni = ny * width + nx;
-                                if (visited[ni] === 0 && edgeDensity[ni] > 0.1 && variance[ni] > varThreshold * 0.7) {
-                                    visited[ni] = 1;
-                                    queue.push(ni);
-                                }
+                                const ni = (y + dy) * width + (x + dx);
+                                if (mask[ni] > 0) neighbors++;
                             }
                         }
-                    }
-
-                    if (region.length > 20) {
-                        regions.push(region);
+                        if (neighbors >= 2) cleaned[idx] = 1;
                     }
                 }
             }
 
-            // Create final mask from detected regions
-            const finalMask = new Uint8Array(totalPixels);
-            for (const region of regions) {
-                // Only keep regions that are reasonably compact and not too large
-                // Calculate bounding box
-                let minX = width,
-                    maxX = 0,
-                    minY = height,
-                    maxY = 0;
-                for (const idx of region) {
-                    const x = idx % width;
-                    const y = Math.floor(idx / width);
-                    if (x < minX) minX = x;
-                    if (x > maxX) maxX = x;
-                    if (y < minY) minY = y;
-                    if (y > maxY) maxY = y;
-                }
-                const regionW = maxX - minX + 1;
-                const regionH = maxY - minY + 1;
-                const area = regionW * regionH;
-
-                // Filter: not too large (avoid selecting the whole image)
-                // and not too small (avoid noise)
-                if (region.length > 30 && region.length < area * 0.8 && regionW > 10 && regionH > 10) {
-                    for (const idx of region) {
-                        finalMask[idx] = 1;
-                    }
-                }
-            }
-
-            return finalMask;
+            return cleaned;
         }
 
         // ================================================================
-        // WM TAB LOGIC (IMPROVED)
+        // WM TAB LOGIC (Optimized)
         // ================================================================
 
         function handleWmFile(file) {
@@ -2559,11 +2420,33 @@
                     format: file.type
                 };
 
-                // Set up canvas with overlay for drawing
+                // Check if we need to resize for processing
+                const maxDim = 1600;
+                const needsResize = img.width > maxDim || img.height > maxDim;
+                let displayW = img.width,
+                    displayH = img.height;
+                let processW = img.width,
+                    processH = img.height;
+
+                if (needsResize) {
+                    const ratio = Math.min(maxDim / img.width, maxDim / img.height);
+                    processW = Math.round(img.width * ratio);
+                    processH = Math.round(img.height * ratio);
+                    displayW = processW;
+                    displayH = processH;
+                    state.wm.processedWidth = processW;
+                    state.wm.processedHeight = processH;
+                    wmProcessingResized = true;
+                } else {
+                    state.wm.processedWidth = img.width;
+                    state.wm.processedHeight = img.height;
+                    wmProcessingResized = false;
+                }
+
+                // Set up canvas
                 const wrap = wmOriginalWrap;
                 wrap.innerHTML = '';
 
-                // Create a container for the canvas and hint
                 const container = document.createElement('div');
                 container.style.position = 'relative';
                 container.style.width = '100%';
@@ -2572,8 +2455,8 @@
                 container.style.justifyContent = 'center';
 
                 const canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
+                canvas.width = displayW;
+                canvas.height = displayH;
                 canvas.style.maxWidth = '100%';
                 canvas.style.maxHeight = '450px';
                 canvas.style.objectFit = 'contain';
@@ -2581,28 +2464,39 @@
                 canvas.style.cursor = 'crosshair';
                 canvas.style.width = '100%';
                 canvas.style.height = 'auto';
-                canvas.style.aspectRatio = img.width + '/' + img.height;
+                canvas.style.aspectRatio = displayW + '/' + displayH;
                 container.appendChild(canvas);
 
-                // Add hint
                 const hint = document.createElement('div');
                 hint.className = 'selection-hint';
                 hint.textContent = state.wm.mode === 'rectangle' ? '▭ Drag to draw a rectangle around the logo' :
                     state.wm.mode === 'brush' ? '✏️ Paint over the logo' :
                     '🤖 Auto-detecting logos...';
                 container.appendChild(hint);
-
                 wrap.appendChild(container);
 
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0);
+                // Draw the image (resized if needed)
+                if (needsResize) {
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = processW;
+                    tempCanvas.height = processH;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.drawImage(img, 0, 0, processW, processH);
+                    ctx.drawImage(tempCanvas, 0, 0, displayW, displayH);
+                } else {
+                    ctx.drawImage(img, 0, 0);
+                }
+
                 wmCanvas = canvas;
                 wmCtx = ctx;
                 wmImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
                 wmOriginalImageData = new Uint8ClampedArray(wmImageData.data);
-
-                // Store original data URL for reset
                 canvas.dataset.originalData = canvas.toDataURL();
+
+                // Store original dimensions for final output
+                state.wm.originalWidth = img.width;
+                state.wm.originalHeight = img.height;
 
                 wmOriginalSize.textContent = formatFileSize(file.size);
                 wmOriginalFormat.textContent = file.type.replace('image/', '').toUpperCase();
@@ -2612,15 +2506,11 @@
                 wmResultSize.textContent = '—';
                 wmResultStatus.textContent = '—';
 
-                // Initialize mask
                 wmMask = new Uint8Array(canvas.width * canvas.height);
-
-                // Setup events based on current mode
                 setupWmCanvasEvents(canvas);
 
-                // If auto mode, run detection
                 if (state.wm.mode === 'auto') {
-                    setTimeout(() => runAutoDetection(canvas), 300);
+                    setTimeout(() => runAutoDetectionFast(canvas), 300);
                 }
 
                 removeWmBtn.disabled = false;
@@ -2635,41 +2525,29 @@
         }
 
         function setupWmCanvasEvents(canvas) {
-            // Remove old listeners by cloning
             const newCanvas = canvas.cloneNode(true);
             canvas.parentNode.replaceChild(newCanvas, canvas);
             wmCanvas = newCanvas;
             wmCtx = newCanvas.getContext('2d');
 
-            // Restore original image
             const img = new Image();
             img.onload = () => {
                 wmCtx.drawImage(img, 0, 0);
-                // Restore image data
                 const imageData = wmCtx.getImageData(0, 0, wmCanvas.width, wmCanvas.height);
                 wmImageData = imageData;
                 wmOriginalImageData = new Uint8ClampedArray(imageData.data);
-                // Reset mask
                 wmMask = new Uint8Array(wmCanvas.width * wmCanvas.height);
                 wmMaskDirty = false;
-                // Redraw mask overlay if any
                 if (state.wm.mode === 'auto' && state.wm.autoDetected) {
                     drawMaskOverlay();
                 }
             };
             img.src = wmCanvas.dataset.originalData || state.wm.originalData.url;
 
-            // Determine which interaction to use based on mode
             const mode = state.wm.mode || 'rectangle';
-
-            if (mode === 'rectangle') {
-                setupRectMode(newCanvas);
-            } else if (mode === 'brush') {
-                setupBrushMode(newCanvas);
-            } else if (mode === 'auto') {
-                // Auto mode uses the mask from detection
-                setupAutoMode(newCanvas);
-            }
+            if (mode === 'rectangle') setupRectMode(newCanvas);
+            else if (mode === 'brush') setupBrushMode(newCanvas);
+            else if (mode === 'auto') setupAutoMode(newCanvas);
         }
 
         // ---------- RECTANGLE MODE ----------
@@ -2698,16 +2576,13 @@
                 startY = pos.y;
                 wmStartX = startX;
                 wmStartY = startY;
-                // Clear previous selection
                 wmRect = null;
                 state.wm.selection = null;
                 wmMask = new Uint8Array(canvas.width * canvas.height);
                 wmMaskDirty = false;
-                // Redraw original
                 const img = new Image();
                 img.onload = () => {
                     wmCtx.drawImage(img, 0, 0);
-                    // Update hint
                     updateHint('▭ Drag to draw a rectangle around the logo');
                 };
                 img.src = canvas.dataset.originalData || state.wm.originalData.url;
@@ -2733,9 +2608,7 @@
                         wmCtx.fillStyle = 'rgba(37, 99, 235, 0.15)';
                         wmCtx.fillRect(x, y, w, h);
                         wmRect = { x, y, w, h };
-                    } else {
-                        wmRect = null;
-                    }
+                    } else { wmRect = null; }
                 };
                 img.src = canvas.dataset.originalData || state.wm.originalData.url;
             };
@@ -2745,12 +2618,11 @@
                 isDown = false;
                 if (wmRect && (wmRect.w > 5 && wmRect.h > 5)) {
                     state.wm.selection = { ...wmRect };
-                    // Update mask from rectangle
                     const mask = new Uint8Array(canvas.width * canvas.height);
-                    const x = Math.round(wmRect.x);
-                    const y = Math.round(wmRect.y);
-                    const w = Math.round(wmRect.w);
-                    const h = Math.round(wmRect.h);
+                    const x = Math.round(wmRect.x),
+                        y = Math.round(wmRect.y);
+                    const w = Math.round(wmRect.w),
+                        h = Math.round(wmRect.h);
                     for (let py = y; py < y + h; py++) {
                         for (let px = x; px < x + w; px++) {
                             if (px >= 0 && px < canvas.width && py >= 0 && py < canvas.height) {
@@ -2783,8 +2655,6 @@
             canvas.addEventListener('touchstart', startDraw, { passive: false });
             canvas.addEventListener('touchmove', moveDraw, { passive: false });
             canvas.addEventListener('touchend', endDraw, { passive: false });
-
-            // Update hint
             updateHint('▭ Drag to draw a rectangle around the logo');
         }
 
@@ -2808,10 +2678,9 @@
             const paintAt = (x, y) => {
                 const radius = Math.max(2, brushSize / 2);
                 const mask = wmMask || new Uint8Array(canvas.width * canvas.height);
-                const px = Math.round(x);
-                const py = Math.round(y);
+                const px = Math.round(x),
+                    py = Math.round(y);
                 const r = Math.round(radius);
-
                 for (let dy = -r; dy <= r; dy++) {
                     for (let dx = -r; dx <= r; dx++) {
                         const dist = Math.sqrt(dx * dx + dy * dy);
@@ -2851,9 +2720,7 @@
                 if (state.wm.brushPoints.length > 0) {
                     wmResultStatus.textContent = `✅ Logo painted (${state.wm.brushPoints.length} strokes)`;
                     updateHint(`✅ ${state.wm.brushPoints.length} strokes applied`);
-                } else {
-                    wmResultStatus.textContent = '—';
-                }
+                } else { wmResultStatus.textContent = '—'; }
             };
 
             canvas.addEventListener('mousedown', startPaint);
@@ -2865,59 +2732,41 @@
             canvas.addEventListener('touchend', endPaint, { passive: false });
 
             updateHint('✏️ Paint over the logo to mark it for removal');
-
-            // Brush size change
-            brushSizeSlider.addEventListener('input', () => {
-                brushSizeValue.textContent = brushSizeSlider.value;
-                // Update brush cursor size visually
-            });
+            brushSizeSlider.addEventListener('input', () => { brushSizeValue.textContent = brushSizeSlider.value; });
         }
 
         // ---------- AUTO MODE ----------
         function setupAutoMode(canvas) {
             updateHint('🤖 AI is analyzing the image...');
-            // Auto detection already ran when image loaded
-            // Just show the mask if available
             if (state.wm.autoDetected && wmMask) {
                 drawMaskOverlay();
                 removeWmBtn.disabled = false;
                 const maskedCount = wmMask.reduce((a, b) => a + b, 0);
-                wmResultStatus.textContent = `🤖 AI detected ${Math.round(maskedCount / (canvas.width * canvas.height) * 100)}% logo area`;
-                updateHint(`✅ AI detected logo area (${Math.round(maskedCount / (canvas.width * canvas.height) * 100)}% coverage)`);
+                wmResultStatus.textContent =
+                `🤖 AI detected ${Math.round(maskedCount / (canvas.width * canvas.height) * 100)}% logo area`;
+                updateHint(`✅ AI detected logo area`);
             } else {
-                // Run detection
-                runAutoDetection(canvas);
+                runAutoDetectionFast(canvas);
             }
-
-            // In auto mode, clicking just re-runs detection
-            canvas.addEventListener('click', (e) => {
-                if (state.wm.mode === 'auto') {
-                    runAutoDetection(canvas);
-                }
-            });
+            canvas.addEventListener('click', (e) => { if (state.wm.mode === 'auto') runAutoDetectionFast(canvas); });
             canvas.addEventListener('touchstart', (e) => {
-                if (state.wm.mode === 'auto') {
-                    e.preventDefault();
-                    runAutoDetection(canvas);
-                }
+                if (state.wm.mode === 'auto') { e.preventDefault();
+                    runAutoDetectionFast(canvas); }
             }, { passive: false });
         }
 
-        function runAutoDetection(canvas) {
+        function runAutoDetectionFast(canvas) {
             showLoading(true, 'Detecting logos...', 10);
             setTimeout(() => {
                 const ctx = canvas.getContext('2d');
                 const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-                const mask = detectLogos(imageData);
+                const mask = detectLogosFast(imageData);
 
-                // Count masked pixels
                 let maskedCount = 0;
-                for (let i = 0; i < mask.length; i++) {
-                    if (mask[i] > 0) maskedCount++;
-                }
+                for (let i = 0; i < mask.length; i++) { if (mask[i] > 0) maskedCount++; }
 
                 if (maskedCount < 50) {
-                    showError(errorMsgWm, 'No logo/watermark detected. Try selecting manually with Rectangle or Brush mode.');
+                    showError(errorMsgWm, 'No logo/watermark detected. Try manual selection.');
                     wmMask = new Uint8Array(canvas.width * canvas.height);
                     state.wm.autoDetected = false;
                     removeWmBtn.disabled = true;
@@ -2930,14 +2779,10 @@
                 state.wm.autoDetected = true;
                 wmMaskDirty = true;
                 removeWmBtn.disabled = false;
-
-                // Draw mask overlay
                 drawMaskOverlay();
-
                 const pct = Math.round(maskedCount / (canvas.width * canvas.height) * 100);
                 wmResultStatus.textContent = `🤖 AI detected ${pct}% logo area`;
                 updateHint(`✅ AI detected ${pct}% of the image as logo/watermark`);
-
                 showLoading(false, 'Detection complete', 100);
             }, 100);
         }
@@ -2945,48 +2790,35 @@
         // ---------- MASK OVERLAY DRAWING ----------
         function drawMaskOverlay() {
             if (!wmCanvas || !wmCtx || !wmMask) return;
+            const canvas = wmCanvas,
+                ctx = wmCtx;
+            const width = canvas.width,
+                height = canvas.height;
 
-            const canvas = wmCanvas;
-            const ctx = wmCtx;
-            const width = canvas.width;
-            const height = canvas.height;
-
-            // Restore original image
             const img = new Image();
             img.onload = () => {
                 ctx.drawImage(img, 0, 0);
-
-                // Draw mask overlay
                 const imageData = ctx.getImageData(0, 0, width, height);
                 const data = imageData.data;
-
-                // Highlight masked areas with a semi-transparent blue overlay
                 for (let i = 0; i < wmMask.length; i++) {
                     if (wmMask[i] > 0) {
                         const idx = i * 4;
                         data[idx] = Math.min(255, data[idx] + 60);
                         data[idx + 1] = Math.max(0, data[idx + 1] - 40);
                         data[idx + 2] = Math.max(0, data[idx + 2] - 40);
-                        // Add a subtle blue tint
                         data[idx] = Math.round(data[idx] * 0.7 + 80);
                         data[idx + 1] = Math.round(data[idx + 1] * 0.5 + 60);
                         data[idx + 2] = Math.round(data[idx + 2] * 0.3 + 150);
                     }
                 }
-
                 ctx.putImageData(imageData, 0, 0);
 
-                // Draw border around masked regions for clarity
+                // Draw boundary
                 const maskData = wmMask;
-                const borderColor = 'rgba(37, 99, 235, 0.6)';
-                ctx.strokeStyle = borderColor;
-                ctx.lineWidth = 1.5;
-
                 for (let y = 1; y < height - 1; y++) {
                     for (let x = 1; x < width - 1; x++) {
                         const idx = y * width + x;
                         if (maskData[idx] > 0) {
-                            // Check if this is a boundary pixel
                             const isBoundary =
                                 maskData[(y - 1) * width + x] === 0 ||
                                 maskData[(y + 1) * width + x] === 0 ||
@@ -3003,72 +2835,88 @@
             img.src = canvas.dataset.originalData || state.wm.originalData.url;
         }
 
-        // ---------- UPDATE HINT ----------
         function updateHint(text) {
             const container = wmOriginalWrap.querySelector('.selection-hint');
-            if (container) {
-                container.textContent = text;
-            }
+            if (container) container.textContent = text;
         }
 
-        // ---------- PERFORM WM REMOVAL (ENHANCED) ----------
+        // ================================================================
+        // PERFORM WM REMOVAL (Optimized)
+        // ================================================================
         function performWmRemoval() {
-            if (!state.wm.originalData) {
-                showError(errorMsgWm, 'Please upload an image first.');
-                return;
-            }
+            if (!state.wm.originalData) { showError(errorMsgWm, 'Please upload an image first.'); return; }
+            if (!wmMask || wmMask.length === 0) { showError(errorMsgWm,
+                    'Please select the logo/watermark area first using Rectangle, Brush, or Auto mode.'); return; }
 
-            // Check if we have a mask
-            if (!wmMask || wmMask.length === 0) {
-                showError(errorMsgWm, 'Please select the logo/watermark area first using Rectangle, Brush, or Auto mode.');
-                return;
-            }
-
-            // Count masked pixels
             let maskedCount = 0;
-            for (let i = 0; i < wmMask.length; i++) {
-                if (wmMask[i] > 0) maskedCount++;
-            }
-
-            if (maskedCount < 5) {
-                showError(errorMsgWm, 'No logo/watermark area selected. Please mark the area first.');
-                return;
-            }
+            for (let i = 0; i < wmMask.length; i++) { if (wmMask[i] > 0) maskedCount++; }
+            if (maskedCount < 5) { showError(errorMsgWm, 'No logo/watermark area selected. Please mark the area first.'); return; }
 
             showLoading(true, 'Inpainting logo area...', 5);
 
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            canvas.width = state.wm.originalData.width;
-            canvas.height = state.wm.originalData.height;
 
+            // Use the processed dimensions (which may be resized)
+            const procW = state.wm.processedWidth || wmCanvas.width;
+            const procH = state.wm.processedHeight || wmCanvas.height;
+            canvas.width = procW;
+            canvas.height = procH;
+
+            // Draw the original image at the processed size
             const img = new Image();
             img.onload = () => {
-                ctx.drawImage(img, 0, 0);
-                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, procW, procH);
+                const imageData = ctx.getImageData(0, 0, procW, procH);
 
-                // Use the mask from the current state
-                const mask = wmMask;
+                // Scale the mask if needed
+                let maskToUse = wmMask;
+                if (wmMask.length !== procW * procH) {
+                    // Resize mask to match processed dimensions
+                    const scaledMask = new Uint8Array(procW * procH);
+                    const scaleX = wmCanvas.width / procW;
+                    const scaleY = wmCanvas.height / procH;
+                    for (let y = 0; y < procH; y++) {
+                        for (let x = 0; x < procW; x++) {
+                            const srcX = clamp(Math.round(x * scaleX), 0, wmCanvas.width - 1);
+                            const srcY = clamp(Math.round(y * scaleY), 0, wmCanvas.height - 1);
+                            const srcIdx = srcY * wmCanvas.width + srcX;
+                            if (srcIdx < wmMask.length) {
+                                scaledMask[y * procW + x] = wmMask[srcIdx];
+                            }
+                        }
+                    }
+                    maskToUse = scaledMask;
+                }
 
-                // Get patch size
                 const patchSize = parseInt(patchSizeSlider.value) || 10;
 
                 updateProgress('Applying content-aware fill...', 20);
 
-                // Run inpainting with progress callback
-                const resultData = inpaintImage(
+                const resultData = inpaintImageOptimized(
                     imageData,
-                    new Uint8Array(mask),
+                    new Uint8Array(maskToUse),
                     patchSize,
                     (pct) => updateProgress(`Inpainting... ${Math.round(pct)}%`, pct)
                 );
 
                 updateProgress('Finalizing...', 95);
 
-                const resultImageData = new ImageData(resultData, canvas.width, canvas.height);
+                const resultImageData = new ImageData(resultData, procW, procH);
                 ctx.putImageData(resultImageData, 0, 0);
 
-                const resultUrl = canvas.toDataURL('image/png');
+                // If we need to scale back to original size
+                let finalCanvas = canvas;
+                if (state.wm.originalWidth !== procW || state.wm.originalHeight !== procH) {
+                    const fullCanvas = document.createElement('canvas');
+                    fullCanvas.width = state.wm.originalWidth;
+                    fullCanvas.height = state.wm.originalHeight;
+                    const fullCtx = fullCanvas.getContext('2d');
+                    fullCtx.drawImage(canvas, 0, 0, state.wm.originalWidth, state.wm.originalHeight);
+                    finalCanvas = fullCanvas;
+                }
+
+                const resultUrl = finalCanvas.toDataURL('image/png');
                 const resultBlob = dataURLToBlob(resultUrl);
 
                 if (state.wm.resultData?.url) revokeUrl(state.wm.resultData.url);
@@ -3079,7 +2927,8 @@
                 };
                 state.wm.processed = true;
 
-                wmResultWrap.innerHTML = `<img src="${state.wm.resultData.url}" alt="Result" />`;
+                wmResultWrap.innerHTML =
+                    `<img src="${state.wm.resultData.url}" alt="Result" style="max-width:100%;max-height:450px;object-fit:contain;" />`;
                 wmResultSize.textContent = formatFileSize(resultBlob.size);
                 wmResultFormat.textContent = 'PNG';
                 wmResultStatus.textContent = `✅ Logo/watermark removed (${maskedCount} pixels)`;
@@ -3087,10 +2936,8 @@
                 downloadWmBtn.disabled = false;
                 showLoading(false, 'Done!', 100);
             };
-            img.onerror = () => {
-                showLoading(false);
-                showError(errorMsgWm, 'Failed to process image.');
-            };
+            img.onerror = () => { showLoading(false);
+                showError(errorMsgWm, 'Failed to process image.'); };
             img.src = state.wm.originalData.url;
         }
 
@@ -3157,18 +3004,14 @@
             if (e.dataTransfer.files.length > 0) handleWmFile(e.dataTransfer.files[0]);
         });
 
-        // Mode selector
         modeSelector.querySelectorAll('.mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 modeSelector.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 const mode = btn.dataset.mode;
                 state.wm.mode = mode;
-
-                // Show/hide brush size
                 brushSizeGroup.style.display = mode === 'brush' ? 'flex' : 'none';
 
-                // Reset selection when changing modes
                 wmMask = new Uint8Array(wmCanvas ? wmCanvas.width * wmCanvas.height : 0);
                 wmMaskDirty = false;
                 state.wm.autoDetected = false;
@@ -3176,9 +3019,7 @@
                 state.wm.selection = null;
                 wmRect = null;
 
-                // Re-setup events
                 if (wmCanvas) {
-                    // Clone to remove old listeners
                     const parent = wmCanvas.parentNode;
                     const newCanvas = wmCanvas.cloneNode(true);
                     parent.replaceChild(newCanvas, wmCanvas);
@@ -3191,35 +3032,22 @@
                         wmImageData = wmCtx.getImageData(0, 0, wmCanvas.width, wmCanvas.height);
                         wmOriginalImageData = new Uint8ClampedArray(wmImageData.data);
                         wmCanvas.dataset.originalData = img.src;
-
-                        // Setup new events based on mode
-                        if (mode === 'rectangle') {
-                            setupRectMode(wmCanvas);
-                            updateHint('▭ Drag to draw a rectangle around the logo');
-                        } else if (mode === 'brush') {
-                            setupBrushMode(wmCanvas);
-                            updateHint('✏️ Paint over the logo to mark it');
-                        } else if (mode === 'auto') {
+                        if (mode === 'rectangle') { setupRectMode(wmCanvas);
+                            updateHint('▭ Drag to draw a rectangle around the logo'); } else if (mode ===
+                            'brush') { setupBrushMode(wmCanvas);
+                            updateHint('✏️ Paint over the logo to mark it'); } else if (mode === 'auto') {
                             setupAutoMode(wmCanvas);
-                            // Run detection
-                            setTimeout(() => runAutoDetection(wmCanvas), 200);
-                        }
+                            setTimeout(() => runAutoDetectionFast(wmCanvas), 200); }
                     };
                     img.src = wmCanvas.dataset.originalData || state.wm.originalData.url;
                 }
-
                 removeWmBtn.disabled = true;
                 wmResultStatus.textContent = '—';
             });
         });
 
-        patchSizeSlider.addEventListener('input', () => {
-            patchSizeValue.textContent = patchSizeSlider.value;
-        });
-
-        brushSizeSlider.addEventListener('input', () => {
-            brushSizeValue.textContent = brushSizeSlider.value;
-        });
+        patchSizeSlider.addEventListener('input', () => { patchSizeValue.textContent = patchSizeSlider.value; });
+        brushSizeSlider.addEventListener('input', () => { brushSizeValue.textContent = brushSizeSlider.value; });
 
         removeWmBtn.addEventListener('click', performWmRemoval);
         downloadWmBtn.addEventListener('click', downloadWmResult);
@@ -3235,11 +3063,8 @@
                     if (item.type.startsWith('image/')) {
                         const file = item.getAsFile();
                         if (file) {
-                            if (activeTab === 'background') {
-                                handleBgFile(file);
-                            } else {
-                                handleWmFile(file);
-                            }
+                            if (activeTab === 'background') handleBgFile(file);
+                            else handleWmFile(file);
                             break;
                         }
                     }
