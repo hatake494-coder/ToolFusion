@@ -1,0 +1,1433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact ToolFusion – Get in Touch</title>
+    <meta name="description" content="Have questions or feedback? Contact ToolFusion – we'd love to hear from you. Reach out via email, visit our website, or use our contact form." />
+    <link rel="canonical" href="https://toolfusion.com/contact.html" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="Contact ToolFusion – Get in Touch" />
+    <meta property="og:description" content="Have questions or feedback? Contact ToolFusion – we'd love to hear from you. Reach out via our contact form." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://toolfusion.com/contact.html" />
+    <meta property="og:image" content="https://toolfusion.com/og-image.jpg" />
+    <meta property="og:site_name" content="ToolFusion" />
+
+    <!-- Twitter Cards -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Contact ToolFusion – Get in Touch" />
+    <meta name="twitter:description" content="Have questions or feedback? Contact ToolFusion – we'd love to hear from you." />
+    <meta name="twitter:image" content="https://toolfusion.com/twitter-image.jpg" />
+
+    <!-- Schema.org JSON-LD -->
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "ContactPage",
+            "name": "Contact ToolFusion",
+            "description": "Get in touch with ToolFusion. Reach out via email or our contact form.",
+            "url": "https://toolfusion.com/contact.html",
+            "mainEntity": {
+                "@type": "ContactPoint",
+                "contactType": "customer support",
+                "email": "support@toolfusion.com",
+                "availableLanguage": ["English"],
+                "contactOption": "TollFree",
+                "areaServed": "Worldwide"
+            }
+        }
+    </script>
+    <script type="application/ld+json">
+        {
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://toolfusion.com/" },
+                { "@type": "ListItem", "position": 2, "name": "Contact", "item": "https://toolfusion.com/contact.html" }
+            ]
+        }
+    </script>
+
+    <style>
+        /* ===== CSS Variables (matching ToolFusion homepage) ===== */
+        :root {
+            --bg-primary: #f8faff;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --bg-input: #f0f4ff;
+            --bg-nav: rgba(255, 255, 255, 0.80);
+            --text-primary: #0b1a33;
+            --text-secondary: #2d3a4f;
+            --text-muted: #6b7a8f;
+            --border-color: #e6edf5;
+            --shadow-sm: 0 2px 12px rgba(11, 26, 51, 0.06);
+            --shadow-md: 0 8px 32px rgba(11, 26, 51, 0.08);
+            --shadow-lg: 0 16px 56px rgba(11, 26, 51, 0.10);
+            --shadow-hover: 0 20px 60px rgba(11, 26, 51, 0.12);
+            --radius: 16px;
+            --radius-sm: 10px;
+            --radius-full: 60px;
+            --transition: 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            --accent: #2563eb;
+            --accent-light: #3b82f6;
+            --accent-dark: #1d4ed8;
+            --accent-glow: rgba(37, 99, 235, 0.20);
+            --gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            --gradient-soft: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            --nav-height: 72px;
+            --success: #22c55e;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #0a1628;
+            --bg-secondary: #111f3a;
+            --bg-card: #15243f;
+            --bg-input: #1a2a4a;
+            --bg-nav: rgba(10, 22, 40, 0.88);
+            --text-primary: #f0f4ff;
+            --text-secondary: #c8d2e6;
+            --text-muted: #8a9bb5;
+            --border-color: #1e3150;
+            --shadow-sm: 0 2px 12px rgba(0, 0, 0, 0.30);
+            --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.40);
+            --shadow-lg: 0 16px 56px rgba(0, 0, 0, 0.50);
+            --shadow-hover: 0 20px 60px rgba(0, 0, 0, 0.60);
+            --accent-glow: rgba(59, 130, 246, 0.25);
+            --gradient-soft: linear-gradient(135deg, #0f2847 0%, #1a3a66 100%);
+        }
+
+        /* ===== Reset & Base ===== */
+        *,
+        *::before,
+        *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+            font-size: 16px;
+            -webkit-text-size-adjust: 100%;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: background 0.35s ease, color 0.35s ease;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            padding-top: var(--nav-height);
+        }
+
+        a {
+            text-decoration: none;
+            color: inherit;
+            transition: var(--transition);
+        }
+        ul {
+            list-style: none;
+        }
+        img {
+            max-width: 100%;
+            display: block;
+        }
+        button {
+            cursor: pointer;
+            font-family: var(--font);
+            border: none;
+            background: none;
+            color: inherit;
+        }
+        input,
+        textarea {
+            font-family: var(--font);
+            border: none;
+            outline: none;
+            background: none;
+            color: inherit;
+        }
+        label {
+            cursor: pointer;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: var(--bg-primary);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--accent);
+            border-radius: 20px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--accent-dark);
+        }
+
+        /* ===== Buttons ===== */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 28px;
+            border-radius: var(--radius-full);
+            font-weight: 600;
+            font-size: 0.9rem;
+            transition: var(--transition);
+            border: 2px solid transparent;
+            white-space: nowrap;
+        }
+        .btn-primary {
+            background: var(--gradient);
+            color: #fff;
+            box-shadow: 0 4px 20px var(--accent-glow);
+            border-color: var(--accent);
+        }
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 32px var(--accent-glow);
+        }
+        .btn-primary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .btn-outline {
+            background: transparent;
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        .btn-outline:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+            transform: translateY(-3px);
+            background: var(--bg-input);
+        }
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+            border-color: var(--success);
+        }
+        .btn-success:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 32px rgba(34, 197, 94, 0.30);
+        }
+        .btn-sm {
+            padding: 8px 18px;
+            font-size: 0.8rem;
+        }
+        .btn-block {
+            width: 100%;
+        }
+
+        /* ===== Navbar (matching homepage) ===== */
+        .navbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            height: var(--nav-height);
+            background: var(--bg-nav);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+            display: flex;
+            align-items: center;
+        }
+        .navbar.scrolled {
+            box-shadow: var(--shadow-sm);
+        }
+        .navbar .container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            width: 100%;
+        }
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+        .logo span {
+            font-weight: 300;
+            -webkit-text-fill-color: var(--text-muted);
+            background: none;
+        }
+        [data-theme="dark"] .logo span {
+            -webkit-text-fill-color: var(--text-muted);
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 32px;
+        }
+        .nav-links a {
+            font-size: 0.9rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+            transition: var(--transition);
+            position: relative;
+            padding: 4px 0;
+        }
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: var(--gradient);
+            transition: var(--transition);
+            border-radius: 4px;
+        }
+        .nav-links a:hover::after,
+        .nav-links a.active::after {
+            width: 100%;
+        }
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+        .nav-links a.active {
+            color: var(--text-primary);
+        }
+
+        .nav-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+        .nav-search {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-full);
+            padding: 6px 16px 6px 18px;
+            transition: var(--transition);
+            width: 180px;
+        }
+        .nav-search:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-glow);
+        }
+        .nav-search input {
+            background: transparent;
+            font-size: 0.85rem;
+            padding: 6px 0;
+            width: 100%;
+            min-width: 60px;
+            color: var(--text-primary);
+        }
+        .nav-search input::placeholder {
+            color: var(--text-muted);
+        }
+        .nav-search .search-icon {
+            color: var(--text-muted);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+        }
+
+        .theme-toggle {
+            padding: 8px;
+            border-radius: 50%;
+            transition: var(--transition);
+            font-size: 1.2rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+        }
+        .theme-toggle:hover {
+            background: var(--bg-input);
+        }
+
+        .hamburger {
+            display: none;
+            flex-direction: column;
+            gap: 5px;
+            padding: 6px;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+        .hamburger:hover {
+            background: var(--bg-input);
+        }
+        .hamburger span {
+            display: block;
+            width: 24px;
+            height: 2.5px;
+            background: var(--text-primary);
+            border-radius: 4px;
+            transition: var(--transition);
+            transform-origin: center;
+        }
+        .hamburger.active span:nth-child(1) {
+            transform: rotate(45deg) translate(5px, 5px);
+        }
+        .hamburger.active span:nth-child(2) {
+            opacity: 0;
+            transform: scaleX(0);
+        }
+        .hamburger.active span:nth-child(3) {
+            transform: rotate(-45deg) translate(5px, -5px);
+        }
+
+        /* ===== Breadcrumb ===== */
+        .breadcrumb {
+            padding: 20px 0 0;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .breadcrumb a {
+            color: var(--accent);
+        }
+        .breadcrumb a:hover {
+            text-decoration: underline;
+        }
+        .breadcrumb span {
+            margin: 0 4px;
+        }
+
+        /* ===== Contact Page Specific Styles ===== */
+        .contact-section {
+            padding: 40px 0 60px;
+        }
+
+        .contact-hero {
+            text-align: center;
+            padding: 40px 0 20px;
+            background: var(--gradient-soft);
+            border-bottom: 1px solid var(--border-color);
+            transition: background 0.35s ease;
+        }
+        [data-theme="dark"] .contact-hero {
+            background: var(--bg-secondary);
+        }
+        .contact-hero h1 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 8px;
+        }
+        .contact-hero h1 .highlight {
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .contact-hero p {
+            color: var(--text-secondary);
+            font-size: 1.05rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .contact-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            padding: 28px 24px;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .contact-card:hover {
+            box-shadow: var(--shadow-md);
+        }
+        .contact-card .card-title {
+            font-weight: 700;
+            font-size: 1.1rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-primary);
+        }
+        .contact-card .card-title .emoji {
+            font-size: 1.3rem;
+        }
+        .contact-card p {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            line-height: 1.8;
+        }
+
+        /* Contact Info Grid */
+        .contact-info-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        .contact-info-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 20px 16px;
+            text-align: center;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+        }
+        .contact-info-item:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--accent-light);
+        }
+        .contact-info-item .icon {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .contact-info-item h4 {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+        }
+        .contact-info-item p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+            word-break: break-word;
+        }
+
+        /* Form */
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+        .form-group label .required {
+            color: var(--danger);
+        }
+        .form-group .input-wrap {
+            display: flex;
+            align-items: center;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 4px 12px;
+            transition: var(--transition);
+        }
+        .form-group .input-wrap:focus-within {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 4px var(--accent-glow);
+        }
+        .form-group .input-wrap input,
+        .form-group .input-wrap textarea {
+            background: transparent;
+            padding: 10px 0;
+            font-size: 0.95rem;
+            width: 100%;
+            color: var(--text-primary);
+            font-family: var(--font);
+        }
+        .form-group .input-wrap textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+        .form-group .input-wrap input::placeholder,
+        .form-group .input-wrap textarea::placeholder {
+            color: var(--text-muted);
+        }
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+        .form-group .helper-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .form-group .error-text {
+            font-size: 0.75rem;
+            color: var(--danger);
+            margin-top: 4px;
+            display: none;
+        }
+        .form-group .error-text.show {
+            display: block;
+        }
+        .form-group.has-error .input-wrap {
+            border-color: var(--danger);
+        }
+        .form-group.has-error .input-wrap:focus-within {
+            border-color: var(--danger);
+            box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.20);
+        }
+
+        .form-success {
+            display: none;
+            padding: 16px 20px;
+            background: rgba(34, 197, 94, 0.10);
+            border: 1px solid var(--success);
+            border-radius: var(--radius-sm);
+            color: var(--success);
+            font-weight: 500;
+            margin-top: 16px;
+            align-items: center;
+            gap: 10px;
+        }
+        .form-success.show {
+            display: flex;
+        }
+
+        /* FAQ Preview */
+        .faq-preview-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+        .faq-preview-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 20px 18px;
+            transition: var(--transition);
+            box-shadow: var(--shadow-sm);
+        }
+        .faq-preview-item:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-md);
+            border-color: var(--accent-light);
+        }
+        .faq-preview-item h4 {
+            font-weight: 600;
+            font-size: 0.95rem;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .faq-preview-item p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .faq-preview-item .faq-link {
+            display: inline-block;
+            margin-top: 8px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--accent);
+        }
+        .faq-preview-item .faq-link:hover {
+            text-decoration: underline;
+        }
+
+        /* CTA */
+        .cta-box {
+            background: var(--gradient);
+            border-radius: var(--radius);
+            padding: 48px 32px;
+            text-align: center;
+            color: #fff;
+            box-shadow: 0 8px 32px var(--accent-glow);
+        }
+        .cta-box h2 {
+            font-size: clamp(1.6rem, 2.5vw, 2.2rem);
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .cta-box p {
+            font-size: 1.05rem;
+            opacity: 0.9;
+            max-width: 500px;
+            margin: 0 auto 24px;
+        }
+        .cta-box .btn {
+            background: #fff;
+            color: var(--accent-dark);
+            border-color: #fff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+        }
+        .cta-box .btn:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+        }
+
+        /* ===== Footer (matching homepage) ===== */
+        .footer {
+            background: var(--bg-secondary);
+            border-top: 1px solid var(--border-color);
+            padding: 48px 0 24px;
+            transition: background 0.35s ease;
+        }
+        .footer-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 32px;
+        }
+        .footer-brand .logo {
+            font-size: 1.4rem;
+            margin-bottom: 8px;
+            display: inline-block;
+        }
+        .footer-brand p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            max-width: 240px;
+            line-height: 1.6;
+        }
+        .footer-col h5 {
+            font-weight: 600;
+            margin-bottom: 14px;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        .footer-col a {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            padding: 4px 0;
+            transition: var(--transition);
+        }
+        .footer-col a:hover {
+            color: var(--accent);
+            transform: translateX(4px);
+        }
+        .footer-social {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+        }
+        .footer-social a {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--bg-input);
+            border: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            transition: var(--transition);
+        }
+        .footer-social a:hover {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+            transform: translateY(-3px);
+        }
+        .footer-bottom {
+            text-align: center;
+            font-size: 0.82rem;
+            color: var(--text-muted);
+            border-top: 1px solid var(--border-color);
+            padding-top: 24px;
+        }
+
+        /* ===== Responsive ===== */
+        @media (max-width: 992px) {
+            .contact-info-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .faq-preview-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            .form-group.full-width {
+                grid-column: 1;
+            }
+            .footer-grid {
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 28px;
+            }
+            .footer-brand {
+                grid-column: 1 / -1;
+            }
+            .nav-links {
+                position: fixed;
+                top: var(--nav-height);
+                left: 0;
+                right: 0;
+                background: var(--bg-nav);
+                backdrop-filter: blur(20px) saturate(180%);
+                -webkit-backdrop-filter: blur(20px) saturate(180%);
+                flex-direction: column;
+                padding: 28px 24px 32px;
+                gap: 16px;
+                border-bottom: 1px solid var(--border-color);
+                transform: translateY(-120%);
+                transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+                box-shadow: var(--shadow-lg);
+                align-items: stretch;
+            }
+            .nav-links.open {
+                transform: translateY(0);
+            }
+            .nav-links a {
+                font-size: 1rem;
+                padding: 8px 0;
+                text-align: center;
+            }
+            .nav-links a::after {
+                display: none;
+            }
+            .hamburger {
+                display: flex;
+            }
+            .nav-search {
+                width: 140px;
+            }
+            .nav-search input {
+                font-size: 0.8rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .contact-card {
+                padding: 20px 16px;
+            }
+            .contact-info-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 12px;
+            }
+            .contact-info-item {
+                padding: 16px 12px;
+            }
+            .contact-info-item .icon {
+                font-size: 1.6rem;
+            }
+            .faq-preview-grid {
+                grid-template-columns: 1fr;
+            }
+            .footer-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 24px;
+            }
+            .footer-brand {
+                grid-column: 1 / -1;
+            }
+            .nav-search {
+                width: 120px;
+            }
+            .nav-search input {
+                min-width: 40px;
+            }
+            .cta-box {
+                padding: 32px 20px;
+            }
+            .cta-box h2 {
+                font-size: 1.4rem;
+            }
+            .form-group .input-wrap input,
+            .form-group .input-wrap textarea {
+                font-size: 0.9rem;
+                padding: 8px 0;
+            }
+            .form-group .input-wrap textarea {
+                min-height: 80px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .contact-hero {
+                padding: 24px 0 12px;
+            }
+            .contact-hero h1 {
+                font-size: 1.6rem;
+            }
+            .contact-hero p {
+                font-size: 0.95rem;
+            }
+            .contact-card {
+                padding: 16px 12px;
+            }
+            .contact-info-grid {
+                grid-template-columns: 1fr 1fr;
+                gap: 8px;
+            }
+            .contact-info-item {
+                padding: 12px 10px;
+            }
+            .contact-info-item .icon {
+                font-size: 1.4rem;
+            }
+            .contact-info-item h4 {
+                font-size: 0.8rem;
+            }
+            .contact-info-item p {
+                font-size: 0.7rem;
+            }
+            .faq-preview-item {
+                padding: 14px 12px;
+            }
+            .faq-preview-item h4 {
+                font-size: 0.85rem;
+            }
+            .faq-preview-item p {
+                font-size: 0.8rem;
+            }
+            .container {
+                padding: 0 16px;
+            }
+            .footer-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            .nav-search {
+                width: 100px;
+            }
+            .nav-search input::placeholder {
+                font-size: 0.7rem;
+            }
+            .logo {
+                font-size: 1.2rem;
+            }
+            .navbar .container {
+                gap: 8px;
+            }
+            .breadcrumb {
+                font-size: 0.7rem;
+                padding: 12px 0 0;
+            }
+            .cta-box {
+                padding: 24px 16px;
+            }
+            .cta-box h2 {
+                font-size: 1.2rem;
+            }
+            .cta-box p {
+                font-size: 0.9rem;
+            }
+            .form-group label {
+                font-size: 0.8rem;
+            }
+        }
+
+        /* ===== Utility ===== */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            border: 0;
+        }
+        .mt-16 {
+            margin-top: 16px;
+        }
+        .mt-24 {
+            margin-top: 24px;
+        }
+        .mt-32 {
+            margin-top: 32px;
+        }
+        .mb-16 {
+            margin-bottom: 16px;
+        }
+        .mb-24 {
+            margin-bottom: 24px;
+        }
+        .text-center {
+            text-align: center;
+        }
+        .gap-16 {
+            gap: 16px;
+        }
+        .flex-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .d-none {
+            display: none !important;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- ===== NAVBAR ===== -->
+    <header class="navbar" id="navbar" role="banner">
+        <div class="container">
+            <a href="/" class="logo" aria-label="ToolFusion home">Tool<span>Fusion</span></a>
+            <ul class="nav-links" id="navLinks" role="menubar">
+                <li role="none"><a href="/" role="menuitem">Home</a></li>
+                <li role="none"><a href="/#tools" role="menuitem">Tools</a></li>
+                <li role="none"><a href="/#categories" role="menuitem">Categories</a></li>
+                <li role="none"><a href="/blog.html" role="menuitem">Blog</a></li>
+                <li role="none"><a href="/about.html" role="menuitem">About</a></li>
+                <li role="none"><a href="/contact.html" role="menuitem" class="active">Contact</a></li>
+            </ul>
+            <div class="nav-actions">
+                <div class="nav-search" role="search">
+                    <span class="search-icon" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+                    </span>
+                    <input type="search" placeholder="Search tools..." aria-label="Search tools" />
+                </div>
+                <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle theme">
+                    <span id="themeIcon">🌙</span>
+                </button>
+                <div class="hamburger" id="hamburger" aria-label="Toggle menu" role="button" tabindex="0">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main>
+
+        <!-- ===== BREADCRUMB ===== -->
+        <div class="container">
+            <nav class="breadcrumb" aria-label="Breadcrumb">
+                <a href="/">Home</a><span>›</span><span>Contact</span>
+            </nav>
+        </div>
+
+        <!-- ===== HERO SECTION ===== -->
+        <section class="contact-hero">
+            <div class="container">
+                <h1>Contact <span class="highlight">ToolFusion</span></h1>
+                <p>We'd love to hear from you. Whether you have questions, feedback, or ideas — reach out anytime.</p>
+            </div>
+        </section>
+
+        <!-- ===== CONTENT ===== -->
+        <section class="contact-section">
+            <div class="container">
+
+                <!-- ===== CONTACT INFORMATION ===== -->
+                <div class="contact-info-grid">
+                    <div class="contact-info-item">
+                        <span class="icon">📧</span>
+                        <h4>Email</h4>
+                        <p><a href="mailto:support@toolfusion.com" style="color:var(--accent);">support@toolfusion.com</a></p>
+                    </div>
+                    <div class="contact-info-item">
+                        <span class="icon">🌐</span>
+                        <h4>Website</h4>
+                        <p><a href="https://toolfusion.com" style="color:var(--accent);">toolfusion.com</a></p>
+                    </div>
+                    <div class="contact-info-item">
+                        <span class="icon">⏱️</span>
+                        <h4>Response Time</h4>
+                        <p>Within 24 hours</p>
+                    </div>
+                    <div class="contact-info-item">
+                        <span class="icon">🕒</span>
+                        <h4>Support Hours</h4>
+                        <p>Mon–Fri, 9AM – 6PM (EST)</p>
+                    </div>
+                </div>
+
+                <!-- ===== CONTACT FORM ===== -->
+                <div class="mt-32">
+                    <div class="contact-card">
+                        <div class="card-title"><span class="emoji">✉️</span> Send Us a Message</div>
+
+                        <form id="contactForm" novalidate>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="contactName">Full Name <span class="required">*</span></label>
+                                    <div class="input-wrap">
+                                        <input type="text" id="contactName" placeholder="John Doe" required autocomplete="name" />
+                                    </div>
+                                    <div class="error-text" id="contactNameError">Please enter your full name.</div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="contactEmail">Email Address <span class="required">*</span></label>
+                                    <div class="input-wrap">
+                                        <input type="email" id="contactEmail" placeholder="john@example.com" required autocomplete="email" />
+                                    </div>
+                                    <div class="error-text" id="contactEmailError">Please enter a valid email address.</div>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label for="contactSubject">Subject <span class="required">*</span></label>
+                                    <div class="input-wrap">
+                                        <input type="text" id="contactSubject" placeholder="What is this about?" required />
+                                    </div>
+                                    <div class="error-text" id="contactSubjectError">Please enter a subject.</div>
+                                </div>
+                                <div class="form-group full-width">
+                                    <label for="contactMessage">Message <span class="required">*</span></label>
+                                    <div class="input-wrap">
+                                        <textarea id="contactMessage" placeholder="Write your message here..." required></textarea>
+                                    </div>
+                                    <div class="error-text" id="contactMessageError">Please enter your message.</div>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-block" id="contactSubmitBtn">
+                                📤 Send Message
+                            </button>
+
+                            <div class="form-success" id="formSuccess">
+                                ✅ Thank you! Your message has been sent successfully. We'll get back to you within 24 hours.
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- ===== FAQ PREVIEW ===== -->
+                <div class="mt-32">
+                    <h2 style="font-size:clamp(1.3rem,2vw,1.8rem);font-weight:700;margin-bottom:20px;letter-spacing:-0.3px;">❓ Frequently Asked Questions</h2>
+                    <div class="faq-preview-grid">
+                        <div class="faq-preview-item">
+                            <h4>Is ToolFusion really free?</h4>
+                            <p>Yes! All tools on ToolFusion are 100% free to use. No signup, no hidden fees, no premium plans.</p>
+                            <a href="/faq.html" class="faq-link">View all FAQs →</a>
+                        </div>
+                        <div class="faq-preview-item">
+                            <h4>Are my files stored anywhere?</h4>
+                            <p>No. All processing happens in your browser. Your files and data never leave your device.</p>
+                            <a href="/faq.html" class="faq-link">View all FAQs →</a>
+                        </div>
+                        <div class="faq-preview-item">
+                            <h4>What tools are available?</h4>
+                            <p>We offer image tools, PDF tools, text tools, calculators, password generators, color tools, and more.</p>
+                            <a href="/faq.html" class="faq-link">View all FAQs →</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ===== CALL TO ACTION ===== -->
+                <div class="mt-32">
+                    <div class="cta-box">
+                        <h2>🚀 Explore Our Free Tools</h2>
+                        <p>Discover 12+ powerful tools designed to help you work smarter and faster.</p>
+                        <a href="/#tools" class="btn">Explore Tools →</a>
+                    </div>
+                </div>
+
+            </div>
+        </section>
+
+    </main>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer" id="footer">
+        <div class="container">
+            <div class="footer-grid">
+                <div class="footer-brand">
+                    <a href="/" class="logo">Tool<span>Fusion</span></a>
+                    <p>100% free online tools for students, professionals, developers, and designers.</p>
+                    <div class="footer-social">
+                        <a href="#" aria-label="Twitter" title="Twitter">🐦</a>
+                        <a href="#" aria-label="GitHub" title="GitHub">🐙</a>
+                        <a href="#" aria-label="YouTube" title="YouTube">▶️</a>
+                        <a href="#" aria-label="Discord" title="Discord">💬</a>
+                    </div>
+                </div>
+                <div class="footer-col">
+                    <h5>Company</h5>
+                    <a href="/about.html">About</a>
+                    <a href="/contact.html">Contact</a>
+                    <a href="/sitemap.html">Sitemap</a>
+                </div>
+                <div class="footer-col">
+                    <h5>Legal</h5>
+                    <a href="/privacy.html">Privacy Policy</a>
+                    <a href="/terms.html">Terms</a>
+                    <a href="/disclaimer.html">Disclaimer</a>
+                </div>
+                <div class="footer-col">
+                    <h5>Tools</h5>
+                    <a href="/tools/image-compressor.html">Image Compressor</a>
+                    <a href="/tools/image-resizer.html">Image Resizer</a>
+                    <a href="/tools/pdf-merge.html">PDF Merge</a>
+                    <a href="/tools/jpg-to-png.html">JPG ⇄ PNG</a>
+                </div>
+                <div class="footer-col">
+                    <h5>Resources</h5>
+                    <a href="/blog.html">Blog</a>
+                    <a href="/guides.html">Guides</a>
+                    <a href="/api.html">API</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                &copy; 2026 ToolFusion. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // ================================================================
+        // THEME TOGGLE
+        // ================================================================
+        (function initTheme() {
+            const toggle = document.getElementById('themeToggle');
+            const icon = document.getElementById('themeIcon');
+            const stored = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const theme = stored || (prefersDark ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+            icon.textContent = theme === 'dark' ? '☀️' : '🌙';
+
+            toggle.addEventListener('click', () => {
+                const current = document.documentElement.getAttribute('data-theme');
+                const next = current === 'dark' ? 'light' : 'dark';
+                document.documentElement.setAttribute('data-theme', next);
+                localStorage.setItem('theme', next);
+                icon.textContent = next === 'dark' ? '☀️' : '🌙';
+            });
+        })();
+
+        // ================================================================
+        // MOBILE MENU
+        // ================================================================
+        (function initMenu() {
+            const hamburger = document.getElementById('hamburger');
+            const navLinks = document.getElementById('navLinks');
+            hamburger.addEventListener('click', () => {
+                const isOpen = navLinks.classList.toggle('open');
+                hamburger.classList.toggle('active');
+                hamburger.setAttribute('aria-expanded', isOpen);
+            });
+            navLinks.querySelectorAll('a').forEach(link => {
+                link.addEventListener('click', () => {
+                    navLinks.classList.remove('open');
+                    hamburger.classList.remove('active');
+                    hamburger.setAttribute('aria-expanded', 'false');
+                });
+            });
+        })();
+
+        // ================================================================
+        // NAVBAR SCROLL
+        // ================================================================
+        (function initNavbarScroll() {
+            const navbar = document.getElementById('navbar');
+            window.addEventListener('scroll', () => {
+                navbar.classList.toggle('scrolled', window.pageYOffset > 20);
+            });
+        })();
+
+        // ================================================================
+        // SEARCH BAR
+        // ================================================================
+        (function initSearch() {
+            const searchInput = document.querySelector('.nav-search input');
+            if (!searchInput) return;
+
+            const tools = [
+                { name: 'Image Compressor', url: '/tools/image-compressor.html', category: 'Image Tools' },
+                { name: 'Image Resizer', url: '/tools/image-resizer.html', category: 'Image Tools' },
+                { name: 'PDF Merge', url: '/tools/pdf-merge.html', category: 'PDF Tools' },
+                { name: 'PDF Split', url: '/tools/pdf-split.html', category: 'PDF Tools' },
+                { name: 'PDF Converter', url: '/tools/pdf-converter.html', category: 'PDF Tools' },
+                { name: 'JPG ⇄ PNG Converter', url: '/tools/jpg-to-png.html', category: 'Image Tools' },
+                { name: 'QR & Barcode Generator', url: '/tools/qr-barcode-generator.html', category: 'Utility' },
+                { name: 'Password Generator', url: '/tools/password-generator.html', category: 'Utility' },
+                { name: 'Text Tools', url: '/tools/text-tools.html', category: 'Text Tools' },
+                { name: 'Calculator Tools', url: '/tools/calculator-tools.html', category: 'Calculator' },
+                { name: 'Color Tools', url: '/tools/color-tools.html', category: 'Utility' },
+                { name: 'Background Remover', url: '/tools/background-remover.html', category: 'Image Tools' },
+            ];
+
+            searchInput.addEventListener('input', function() {
+                const query = this.value.toLowerCase().trim();
+                if (!query) {
+                    clearSearchResults();
+                    return;
+                }
+                const results = tools.filter(t =>
+                    t.name.toLowerCase().includes(query) ||
+                    t.category.toLowerCase().includes(query)
+                );
+                showSearchResults(results, query);
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.nav-search')) {
+                    clearSearchResults();
+                }
+            });
+
+            function showSearchResults(results, query) {
+                clearSearchResults();
+                if (results.length === 0) return;
+
+                const container = document.createElement('div');
+                container.className = 'search-results';
+                container.style.cssText = `
+                    position: absolute;
+                    top: calc(100% + 8px);
+                    left: 0;
+                    right: 0;
+                    background: var(--bg-card);
+                    border: 1px solid var(--border-color);
+                    border-radius: var(--radius-sm);
+                    box-shadow: var(--shadow-lg);
+                    max-height: 300px;
+                    overflow-y: auto;
+                    z-index: 999;
+                    padding: 8px 0;
+                `;
+
+                results.forEach(tool => {
+                    const item = document.createElement('a');
+                    item.href = tool.url;
+                    item.style.cssText = `
+                        display: flex;
+                        align-items: center;
+                        justify-content: space-between;
+                        padding: 8px 16px;
+                        color: var(--text-primary);
+                        transition: background 0.2s;
+                        text-decoration: none;
+                    `;
+                    item.innerHTML = `
+                        <span>${highlightMatch(tool.name, query)}</span>
+                        <span style="font-size:0.7rem;color:var(--text-muted);">${tool.category}</span>
+                    `;
+                    item.addEventListener('mouseenter', () => {
+                        item.style.background = 'var(--bg-input)';
+                    });
+                    item.addEventListener('mouseleave', () => {
+                        item.style.background = 'transparent';
+                    });
+                    container.appendChild(item);
+                });
+
+                const wrapper = document.querySelector('.nav-search');
+                wrapper.style.position = 'relative';
+                wrapper.appendChild(container);
+            }
+
+            function highlightMatch(text, query) {
+                const idx = text.toLowerCase().indexOf(query);
+                if (idx === -1) return text;
+                return text.slice(0, idx) +
+                    `<strong>${text.slice(idx, idx + query.length)}</strong>` +
+                    text.slice(idx + query.length);
+            }
+
+            function clearSearchResults() {
+                document.querySelectorAll('.search-results').forEach(el => el.remove());
+            }
+        })();
+
+        // ================================================================
+        // CONTACT FORM
+        // ================================================================
+        (function initContactForm() {
+            const form = document.getElementById('contactForm');
+            const nameInput = document.getElementById('contactName');
+            const emailInput = document.getElementById('contactEmail');
+            const subjectInput = document.getElementById('contactSubject');
+            const messageInput = document.getElementById('contactMessage');
+            const nameError = document.getElementById('contactNameError');
+            const emailError = document.getElementById('contactEmailError');
+            const subjectError = document.getElementById('contactSubjectError');
+            const messageError = document.getElementById('contactMessageError');
+            const submitBtn = document.getElementById('contactSubmitBtn');
+            const successMsg = document.getElementById('formSuccess');
+
+            function validateField(input, errorEl, validator) {
+                const isValid = validator(input.value.trim());
+                const parent = input.closest('.form-group');
+                if (!isValid) {
+                    parent.classList.add('has-error');
+                    errorEl.classList.add('show');
+                    return false;
+                } else {
+                    parent.classList.remove('has-error');
+                    errorEl.classList.remove('show');
+                    return true;
+                }
+            }
+
+            const validators = {
+                name: (val) => val.length >= 2,
+                email: (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val),
+                subject: (val) => val.length >= 3,
+                message: (val) => val.length >= 10,
+            };
+
+            nameInput.addEventListener('blur', () => validateField(nameInput, nameError, validators.name));
+            nameInput.addEventListener('input', () => validateField(nameInput, nameError, validators.name));
+
+            emailInput.addEventListener('blur', () => validateField(emailInput, emailError, validators.email));
+            emailInput.addEventListener('input', () => validateField(emailInput, emailError, validators.email));
+
+            subjectInput.addEventListener('blur', () => validateField(subjectInput, subjectError, validators.subject));
+            subjectInput.addEventListener('input', () => validateField(subjectInput, subjectError, validators.subject));
+
+            messageInput.addEventListener('blur', () => validateField(messageInput, messageError, validators.message));
+            messageInput.addEventListener('input', () => validateField(messageInput, messageError, validators.message));
+
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+
+                const isNameValid = validateField(nameInput, nameError, validators.name);
+                const isEmailValid = validateField(emailInput, emailError, validators.email);
+                const isSubjectValid = validateField(subjectInput, subjectError, validators.subject);
+                const isMessageValid = validateField(messageInput, messageError, validators.message);
+
+                if (isNameValid && isEmailValid && isSubjectValid && isMessageValid) {
+                    // Simulate sending
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = '⏳ Sending...';
+
+                    setTimeout(() => {
+                        successMsg.classList.add('show');
+                        form.reset();
+                        submitBtn.disabled = false;
+                        submitBtn.textContent = '📤 Send Message';
+                        // Clear error states
+                        document.querySelectorAll('.form-group').forEach(el => el.classList.remove('has-error'));
+                        document.querySelectorAll('.error-text').forEach(el => el.classList.remove('show'));
+
+                        // Auto-hide success after 6 seconds
+                        setTimeout(() => {
+                            successMsg.classList.remove('show');
+                        }, 6000);
+                    }, 1500);
+                } else {
+                    // Focus first invalid field
+                    const firstInvalid = form.querySelector('.form-group.has-error input, .form-group.has-error textarea');
+                    if (firstInvalid) firstInvalid.focus();
+                }
+            });
+        })();
+    </script>
+
+</body>
+</html>
